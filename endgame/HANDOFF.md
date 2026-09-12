@@ -79,19 +79,28 @@ This used to be a synthetic 26-stock/6-ETF/news-headline simulation.
   closing prices**, fetched once from Yahoo Finance's public chart
   endpoint and frozen into the data file (see "Refreshing the real
   price data" below). The game never calls out to the network.
-- Playback: **1 real second = 5 stock-minutes** (`REAL_TICK_MS = 200`ms
-  per bar in `market.js`). A full 780-bar session takes exactly 156
-  real seconds (~2:36) — `sessionDurationMs()` derives this from the
-  data itself, so both pages' sessions are this length automatically.
-  Once a stock's history runs out it just holds its last real price.
+- Playback: **1 real second = 5 stock-minutes overall**, but the screen
+  only updates once a second (`STEP_MS = 1000` in `market.js`), not once
+  per raw minute — each update averages `BARS_PER_STEP = 5` consecutive
+  real 1-minute bars into a single displayed price. That's calmer to
+  watch than the original raw-per-minute tick while covering exactly the
+  same real data at the same overall pace. A full 780-bar session takes
+  156 updates = 156 real seconds (~2:36) — `sessionDurationMs()` derives
+  this from the data itself, so both pages' sessions are this length
+  automatically. Once a stock's history runs out it just holds its last
+  averaged price.
 - There is no synthetic event layer of any kind now — prices move
-  exactly the way they actually did. Nothing on the page predicts
-  which way a price is about to go.
-- The always-visible **Trade History** panel (next to the portfolio,
-  on the main browse screen — not just inside the fullscreen chart
-  view) logs every trade made this session across all 6 stocks, so
-  players can track what they've done without hunting through each
-  stock's small in-overlay log.
+  the way they actually did (averaged, per above). Nothing on the page
+  predicts which way a price is about to go.
+- **All 6 dealt stocks render at once**, stacked as cards on the one
+  page — each card is its own chart with a qty input and BUY/SELL right
+  next to it (`.stock-card` in `js/trading.js`). There is no sidebar list
+  and no separate fullscreen "open a stock to trade it" view anymore;
+  with only 6 stocks a session, showing all of them together is simpler.
+- The always-visible **Trade History** panel (next to the portfolio
+  summary, above the stock cards) logs every trade made this session
+  across all 6 stocks, so players can track what they've done in one
+  place instead of checking each stock separately.
 - Chart line/marker colors (`chart.js`) are CSS custom properties
   (`var(--green)`, `var(--red)`, `var(--border)`, `var(--bg)`), not
   hardcoded hex — they follow whatever theme is loaded.
@@ -121,7 +130,7 @@ endpoint (no API key), used only at data-prep time, never during play.
 | `js/finance.js` | Pure money math: `taxesFor`, `contributionLimits`, `employerMatch`, `planAllocation`, `maxAllocation`, `retirementPayout` |
 | `js/market.js` | Real-data trading engine: `createMarket` (deals 6 random real stocks), `stepMarket`, `sessionDurationMs`, `marketFinished`, `holdingsValue`, plus the unrelated `drawYearlyMarketReturn()` used only for retirement-account growth |
 | `js/career-engine.js` | Pure yearly loop: `newCareer`, `beginYear`, `payExpenses`, `investLeftover`, `recordTradingSession`, `finishYear`, `retireCareer`, `addToLeaderboard`. Mutates a plain `career` object. No fast-forward/skip function exists anywhere in this file |
-| `js/trading.js` | `createTradingFloor(root, opts)` — reusable trading UI (topbar, 6-stock sidebar, portfolio, trade history, fullscreen chart + buy/sell) |
+| `js/trading.js` | `createTradingFloor(root, opts)` — reusable trading UI: topbar, portfolio + trade history, and one card per dealt stock (chart + qty + buy/sell inline, no separate detail view) |
 | `js/chart.js` | `renderChart(svg, history, trades)` — SVG line + buy/sell markers (matched by history `seq`), colored via CSS vars |
 | `js/career.js` | Nest Egg screens. Owns `career`/`market`/`floor`, saves to localStorage, delegated `data-action` buttons |
 | `js/app.js` | Standalone floor page: session summary + personal record around a trading floor |
@@ -148,12 +157,14 @@ Script order: data → `chart` → `market` → `finance` → `trading` →
 ## Verified
 
 - `node --test endgame/tests/nestegg.test.mjs` — 16/16.
-- Headless Chrome run (24 checks, no console errors): standalone floor
-  shows exactly 6 real stocks with no news/sector markup, colored %
-  change intact, countdown ticking off real data, buy/sell, real price
-  replay confirmed to actually move tick-by-tick, trade history panel,
-  session end + Results button, no mobile overflow; career mode reaches
-  the trade phase with no sector/ETF/GRPX language, opens the floor,
+- Headless Chrome run (25 checks, no console errors): standalone floor
+  shows exactly 6 real stock cards (no sidebar/sector markup), each with
+  its own chart and buy/sell, colored % change intact, countdown ticking,
+  buy/sell, the averaged real-price replay confirmed to actually move
+  update-by-update (not static), owned-line updates on the card itself,
+  trade history panel, chart marker drawn, session end + Results button,
+  no mobile overflow; career mode reaches the trade phase with no
+  sector/ETF/GRPX language, opens the floor (6 cards inline, no sidebar),
   trades, ends the session and confirms the position was liquidated to
   cash (not carried over), year-end review has no fast-forward button
   anywhere, reload + continue works with the new save schema, no mobile
