@@ -1,0 +1,26 @@
+import { z } from 'zod';
+import {progressionSchema,dialogueSchema,endingSchema} from './Progression.ts';
+import { dailyReviewSchema,commandSchema } from './DailyReview.ts';
+import { INITIAL_LIFE } from './Life.ts';
+export const categories = ['food', 'housing', 'transit', 'leisure', 'utilities', 'savings'] as const;
+export const categorySchema = z.enum(categories);
+export type CategoryKey = z.infer<typeof categorySchema>;
+const money = z.number().finite().min(0).max(1000000);
+export const allocationsSchema = z.object({ food: money, housing: money, transit: money, leisure: money, utilities: money, savings: money });
+export const profileSchema = z.object({ name: z.string().trim().min(1).max(30), skinTone: z.string().regex(/^#[0-9a-f]{6}$/i), hairColor: z.string().regex(/^#[0-9a-f]{6}$/i), shirtColor: z.string().regex(/^#[0-9a-f]{6}$/i), pantsColor: z.string().regex(/^#[0-9a-f]{6}$/i), income: z.number().min(100).max(100000), allocations: allocationsSchema }).refine(v => Object.values(v.allocations).reduce((a, b) => a + b, 0) <= v.income, { message: 'Your allocations must fit within your monthly income.', path: ['allocations'] });
+export type Profile = z.infer<typeof profileSchema>;
+export const transactionSchema = z.object({ id: z.string().min(1), origin:z.enum(['manual','nessie']).optional(),purpose:z.enum(['saving','gym','health']).optional(),gameDay:z.number().int().positive().optional(), payerId: z.string(), medium: z.enum(['balance', 'rewards']), paymentDate: z.string(), amount: money, description: z.string().max(200), category: categorySchema, kind: z.enum(['purchase', 'income', 'saving']).default('purchase') });
+export type BankTransaction = z.infer<typeof transactionSchema>;
+export const jarSchema = z.object({ category: categorySchema, allocatedAmount: money, spentAmount: money, rolloverAmount: money, minViableSpend: money });
+export type BudgetJar = z.infer<typeof jarSchema>;
+const currentStateSchema = z.object({ version: z.literal(2), progression:progressionSchema,dialogue:z.array(dialogueSchema).default([]),ending:endingSchema, reviews:z.array(dailyReviewSchema).default([]), command:commandSchema.default({message:'',severity:'info',behavior:'calm',day:0}), life: z.object({lastRestTurn:z.number().int().min(0).default(0),lastTidyTurn:z.number().int().min(0).default(0),foodStock:z.number().min(0).max(100),energy:z.number().min(0).max(100),stress:z.number().min(0).max(100),clutter:z.number().int().min(0).max(12),powerOn:z.boolean(),lastEvent:z.string()}).default(INITIAL_LIFE), profile: profileSchema, player: z.object({ name: z.string(), skinTone: z.string(), hairColor: z.string(), shirtColor: z.string(), pantsColor: z.string(), position: z.object({ x: z.number(), y: z.number(), z: z.number() }), targetPosition: z.object({ x: z.number(), y: z.number() }).nullable(), state: z.enum(['idle', 'walking', 'eating', 'working', 'partying', 'sleeping', 'dead','worried']) }), metrics: z.object({ health: z.number().min(0).max(100), happiness: z.number().min(0).max(100), cashBalance: z.number().finite(), debtBalance: money, turn: z.number().int().min(1), roomLevel: z.number().int().min(1) }), jars: z.object({ food: jarSchema, housing: jarSchema, transit: jarSchema, leisure: jarSchema, utilities: jarSchema, savings: jarSchema }), transactions: z.array(transactionSchema), advisorLog: z.array(z.object({ timestamp: z.number(), severity: z.enum(['info', 'warning', 'critical']), message: z.string(), actionablePlan: z.array(z.string()).optional() })), isGameOver: z.boolean(), gameOverReason: z.string().optional(), housingDeficits: z.number().int().min(0), savedTotal: money, completedMonths: z.number().int().min(0), mode: z.enum(['demo', 'nessie']) });
+export const stateSchema=z.preprocess((value)=>{
+ if(typeof value!=='object'||value===null||!('version' in value)||value.version!==1)return value;
+ const legacy=z.object({metrics:z.object({turn:z.number().int().positive()}),completedMonths:z.number().int().min(0),transactions:z.array(transactionSchema)}).safeParse(value);
+ if(!legacy.success)return value;
+ const old=legacy.data;const migratedDay=old.completedMonths*30+((old.metrics.turn-1)%4)*7+1;
+ return {...value,version:2,metrics:{...('metrics' in value&&typeof value.metrics==='object'?value.metrics:{}),turn:migratedDay},transactions:old.transactions.map(t=>({...t,gameDay:t.gameDay??migratedDay})),reviews:[],command:{message:'',severity:'info',behavior:'calm',day:0}};
+},currentStateSchema);
+export type GameState = z.infer<typeof stateSchema>;
+export type PlayerCharacter = GameState['player'];
+export type GameMetrics = GameState['metrics'];

@@ -1,0 +1,4 @@
+import {GoogleGenAI} from '@google/genai';
+const ai=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});
+try{const r=await ai.models.generateContent({model:process.env.GEMINI_MODEL||'gemini-2.5-flash',contents:'Reply with the word connected.',config:{httpOptions:{timeout:15000}}});console.log(JSON.stringify({connected:!!r.text}));}
+catch(e){const message=String(e?.message||'');console.log(JSON.stringify({connected:false,name:e?.name,status:e?.status,invalidKey:/API_KEY_INVALID|API key not valid|invalid.*key/i.test(message),quota:/quota|429|resource.exhausted/i.test(message),network:/fetch failed|ENOTFOUND|network|ECONN|certificate/i.test(message),message:message.replaceAll(process.env.GEMINI_API_KEY||'__empty__','[redacted]').replace(/([?&]key=)[^&\s"]+/g,'$1[redacted]').slice(0,1300)}));}
