@@ -10,7 +10,7 @@ export function roomConditions(game:GameState){
  return warnings;
 }
 export function transactionScene(t:BankTransaction){
- if(t.kind==='income')return {target:{x:8,y:2},activity:'working' as const,line:'Payday. All those hours at the desk paid off.'};
- const scenes={food:{target:{x:3,y:3},activity:'eating' as const,line:'Groceries are home. Time to make something good.'},housing:{target:{x:3,y:7},activity:'sleeping' as const,line:'Rent paid. Tonight, I can sleep a little easier.'},utilities:{target:{x:2,y:4},activity:'working' as const,line:'Lights on. Kettle on. This feels like home again.'},leisure:{target:{x:9,y:9},activity:'partying' as const,line:'A little fun. A little escape from the everyday.'},transit:{target:{x:7,y:11},activity:'walking' as const,line:'Keys, wallet, shoes. Heading out into the world.'},savings:{target:{x:6,y:5},activity:'working' as const,line:'Something set aside for the life I want to build.'}};
+ if(t.kind==='income')return {target:{x:3,y:7},activity:'working' as const,line:'Payday. All those hours at the desk paid off.'};
+ const scenes={food:{target:{x:2,y:2},activity:'eating' as const,line:'Groceries are home. Time to make something good.'},housing:{target:{x:8,y:2},activity:'sleeping' as const,line:'Rent paid. Tonight, I can sleep a little easier.'},utilities:{target:{x:2,y:4},activity:'working' as const,line:'Lights on. Kettle on. This feels like home again.'},leisure:{target:{x:6,y:9},activity:'partying' as const,line:'A little fun. A little escape from the everyday.'},transit:{target:{x:7,y:11},activity:'walking' as const,line:'Keys, wallet, shoes. Heading out into the world.'},savings:{target:{x:7,y:9},activity:'working' as const,line:'Something set aside for the life I want to build.'}};
  return scenes[t.category];
 }

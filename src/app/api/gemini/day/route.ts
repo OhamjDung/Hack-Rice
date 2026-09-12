@@ -1,3 +1,4 @@
+export const maxDuration = 50;
 import { dailyInput } from '@/schemas/api';
 import { analyzeDay } from '@/lib/geminiClient';
 export async function POST(req:Request){

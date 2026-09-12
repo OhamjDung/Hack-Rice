@@ -8,7 +8,7 @@ export function drawAvatar(ctx: CanvasRenderingContext2D, x: number, y: number, 
     const resting=!walking&&(player.state==='sleeping'||player.state==='dead');
     if(resting)y+=15;
     if(!walking&&player.state==='partying')y-=Math.abs(Math.sin(time/220))*4;
-    const step = walking ? Math.sin(time / 85) * 4 : 0;
+    const step = walking ? Math.sin(time / 320) * 3 : 0;
     ctx.fillStyle = player.pantsColor;
     ctx.fillRect(x - 8, y - 17, 7, 17 + step);
     ctx.fillRect(x + 1, y - 17, 7, 17 - step);
