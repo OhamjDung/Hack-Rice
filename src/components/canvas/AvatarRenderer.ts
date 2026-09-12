@@ -17,7 +17,7 @@ export function drawAvatar(ctx: CanvasRenderingContext2D, x: number, y: number, 
     ctx.fillRect(x + 1, y - 3 - step, 9, 5);
     ctx.fillStyle = player.shirtColor;
     ctx.beginPath();
-    ctx.roundRect(x - 11, y - 38, 22, 24, 5);
+    ctx.rect(x - 11, y - 38, 22, 24);
     ctx.fill();
     ctx.fillStyle = player.skinTone;
     ctx.fillRect(x - 14, y - 34, 5, 18);
@@ -26,11 +26,11 @@ export function drawAvatar(ctx: CanvasRenderingContext2D, x: number, y: number, 
     if(!walking&&player.state==='working'){ctx.fillStyle=player.skinTone;ctx.fillRect(x+9,y-31+Math.sin(time/140)*2,10,4);}
     if(!walking&&player.state==='worried'){ctx.fillStyle=player.skinTone;ctx.fillRect(x+9,y-46,5,18);ctx.fillRect(x+5,y-49,9,5);ctx.fillStyle='#d48a42';ctx.font='bold 15px sans-serif';ctx.fillText('!',x+18,y-55);}
     ctx.beginPath();
-    ctx.roundRect(x - 9, y - 57, 18, 21, 6);
+    ctx.rect(x - 9, y - 57, 18, 21);
     ctx.fill();
     ctx.fillStyle = player.hairColor;
     ctx.beginPath();
-    ctx.roundRect(x - 10, y - 60, 20, 10, 5);
+    ctx.rect(x - 10, y - 60, 20, 10);
     ctx.fill();
     ctx.fillRect(x - 10, y - 54, 5, 10);
     ctx.fillStyle = '#39352f';

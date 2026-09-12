@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameState, CategoryKey, BankTransaction, PlayerCharacter } from '@/engine/Types';
 import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
-import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath } from './IsometricEngine';
+import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath, foregroundWalls } from './IsometricEngine';
 export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, paused=false }: {
     game: GameState;
     onInspect: (c: CategoryKey | 'desk') => void;
@@ -106,13 +106,13 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 canvas.width = Math.round(ROOM_VIEW.width * dpr);
                 canvas.height = Math.round(ROOM_VIEW.height * dpr);
             }
-            ctx.imageSmoothingEnabled=true;
+            ctx.imageSmoothingEnabled=false;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.clearRect(0, 0, ROOM_VIEW.width, ROOM_VIEW.height);
             ctx.translate(ROOM_VIEW.width/2, ROOM_VIEW.height/2);
             ctx.scale(camera.current.zoom, camera.current.zoom);
             ctx.translate(-360, -285);
-            const p = (x: number, y: number, z = 0) => { const t = projectRoom(x, y, angle); return [t.screenX, t.screenY - z] as const; };
+            const p = (x: number, y: number, z = 0) => { const t = projectRoom(x, y, angle); return [Math.round(t.screenX), Math.round(t.screenY - z)] as const; };
             const poly = (points: readonly (readonly number[])[], fill: string, stroke?: string) => { ctx.beginPath(); points.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1])); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); if (stroke) {
                 ctx.strokeStyle = stroke;
                 ctx.lineWidth = .7;
@@ -125,36 +125,42 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 if(furnitureMode&&!drawing){renderQueue.push({depth:depth(x+w/2,y+d/2)+base*.001,draw:()=>box(x,y,w,d,h,top,left,right,base)});return;}
                 const yf=Math.cos(angle)-Math.sin(angle)>=0?y+d:y,xf=Math.cos(angle)+Math.sin(angle)>=0?x+w:x;
                 const faces=[{depth:depth(x+w/2,yf),points:[p(x,yf,base),p(x+w,yf,base),p(x+w,yf,h+base),p(x,yf,h+base)],fill:left},{depth:depth(xf,y+d/2),points:[p(xf,y,base),p(xf,y+d,base),p(xf,y+d,h+base),p(xf,y,h+base)],fill:right}];
-                faces.sort((a,b)=>a.depth-b.depth).forEach(f=>poly(f.points,f.fill));
-                poly([p(x,y,h+base),p(x+w,y,h+base),p(x+w,y+d,h+base),p(x,y+d,h+base)],top);
+                faces.sort((a,b)=>a.depth-b.depth).forEach(f=>poly(f.points,f.fill,'#705346'));
+                poly([p(x,y,h+base),p(x+w,y,h+base),p(x+w,y+d,h+base),p(x,y+d,h+base)],top,'#705346');
             };
             ctx.save();
             ctx.filter='blur(6px)';ctx.globalAlpha=.4;
-            poly([p(0, 0, -25), p(12, 0, -25), p(12, 12, -25), p(0, 12, -25)], '#cbc7b8');
+            poly([p(0, 0, -25), p(12, 0, -25), p(12, 12, -25), p(0, 12, -25)], '#53644f');
             ctx.restore();
-            box(0, 0, 12, 12, 12, '#cabc9f', '#b1a386', '#978e77', -12);
+            box(0, 0, 12, 12, 12, '#dbc3a2', '#b48c75', '#96715e', -12);
             for (let x = 0; x < 12; x++)
                 for (let y = 0; y < 12; y++)
-                    poly([p(x, y), p(x + 1, y), p(x + 1, y + 1), p(x, y + 1)], (x + y) % 2 ? '#ddceb0' : '#e5d6ba', '#c9b995');
-            ctx.save();ctx.globalAlpha=Math.cos(angle)+Math.sin(angle)<0?.18:1;
-            box(-.2, 0, .2, 12, 108, '#e4dfd0', '#d6d6c4', '#c5c5b3');
-            ctx.restore();ctx.save();ctx.globalAlpha=Math.cos(angle)-Math.sin(angle)<0?.18:1;
-            box(0, -.2, 12, .2, 108, '#e4dfd0', g.progression.owned.includes('house')?'#aec3bf':'#dce0cd', '#c5c5b3');
-            ctx.restore();ctx.save();ctx.globalAlpha=Math.cos(angle)-Math.sin(angle)<0?.18:1;
-            // Window, art and wall details are projected into the wall planes.
-            poly([p(3, 0, 83), p(6, 0, 83), p(6, 0, 30), p(3, 0, 30)], '#f5f1df', '#999e8f');
-            poly([p(3.15, 0, 80), p(5.85, 0, 80), p(5.85, 0, 33), p(3.15, 0, 33)], '#b4d3d0');
-            poly([p(4.43, -.01, 80), p(4.57, -.01, 80), p(4.57, -.01, 33), p(4.43, -.01, 33)], '#faf7e9');
-            poly([p(3.15, 0, 57), p(5.85, 0, 57), p(5.85, 0, 54), p(3.15, 0, 54)], '#faf7e9');
-            poly([p(0, 6, 82), p(0, 7.5, 82), p(0, 7.5, 43), p(0, 6, 43)], '#b99c73');
-            poly([p(0, 6.15, 78), p(0, 7.35, 78), p(0, 7.35, 47), p(0, 6.15, 47)], '#f4e9cd');
-            ctx.restore();
+                    poly([p(x, y), p(x + 1, y), p(x + 1, y + 1), p(x, y + 1)], (x + y) % 2 ? '#d9c3a4' : '#e6d1b3', '#b99b80');
+            // Foreground walls become a faint upper strip, leaving furniture visible.
+            const nearWalls=foregroundWalls(angle);
+            const drawWall=(wall:'x'|'y',base=0)=>wall==='x'
+                ?box(-.2,0,.2,12,108-base,'#ffcf9f','#eaa071','#dd956f',base)
+                :box(0,-.2,12,.2,108-base,'#ffdab0',g.progression.owned.includes('house')?'#ffc798':'#ffb985','#dd956f',base);
+            if(!nearWalls.includes('x'))drawWall('x');
+            if(!nearWalls.includes('y'))drawWall('y');
+            if(!nearWalls.includes('y')){
+                poly([p(3,0,83),p(6,0,83),p(6,0,30),p(3,0,30)],'#f5f1df','#999e8f');
+                poly([p(3.15,0,80),p(5.85,0,80),p(5.85,0,33),p(3.15,0,33)],'#b4d3d0');
+                poly([p(4.43,0,80),p(4.57,0,80),p(4.57,0,33),p(4.43,0,33)],'#faf7e9');
+                poly([p(3.15,0,57),p(5.85,0,57),p(5.85,0,54),p(3.15,0,54)],'#faf7e9');
+                for(const wx of [3.3,4.7])for(const wz of [38,62])poly([p(wx,0,wz+14),p(wx+.16,0,wz+14),p(wx+.6,0,wz),p(wx+.44,0,wz)],'#dceceb');
+                poly([p(8.2,0,86),p(9.9,0,86),p(9.9,0,48),p(8.2,0,48)],'#995e3c','#614534');
+                poly([p(8.32,0,83),p(9.78,0,83),p(9.78,0,51),p(8.32,0,51)],'#d59663','#e8ae7b');
+                poly([p(8.4,0,81),p(9.7,0,81),p(9.7,0,53),p(8.4,0,53)],'#b8cfbd');
+                poly([p(8.4,0,64),p(8.8,0,71),p(9.2,0,63),p(9.5,0,69),p(9.7,0,62),p(9.7,0,53),p(8.4,0,53)],'#718266');
+                for(const [wx,wz] of [[8.7,64],[9.1,68],[9.35,62]])poly([p(wx,0,wz),p(wx+.18,0,wz),p(wx+.18,0,55),p(wx,0,55)],'#ad8054');
+            }
             // Rug and furniture, in back-to-front order.
-            poly([p(5.9, 6.3), p(10, 6.3), p(10, 11), p(5.9, 11)], '#9ba994');
-            poly([p(6.15, 6.55), p(9.75, 6.55), p(9.75, 10.75), p(6.15, 10.75)], g.progression.owned.includes('rug')?'#c58665':'#b4bea5');
+            poly([p(5.9, 5.3), p(10, 5.3), p(10, 11), p(5.9, 11)], '#607e66');
+            poly([p(6.15, 5.55), p(9.75, 5.55), p(9.75, 10.75), p(6.15, 10.75)], g.progression.owned.includes('rug')?'#c58665':'#a3b183');
             furnitureMode=true;
             renderQueue.push({depth:depth(0.6,2),draw:()=>{
-            box(0, 1.4, 1.2, 1.2, 68, '#f7f4e7', '#e9e6d9', '#c4c7b9');
+            box(0, 1.4, 1.2, 1.2, 68, '#eceaf0', '#cecad5', '#aaa6b5');
             box(1.21, 1.9, .04, .12, 17, '#7d8879', '#7d8879', '#7d8879', 20);
             poly([p(1.21,1.4,44),p(1.21,2.6,44),p(1.21,2.6,42),p(1.21,1.4,42)],'#8b8179');
             poly([p(0,2.61,44),p(1.2,2.61,44),p(1.2,2.61,42),p(0,2.61,42)],'#8b8179');
@@ -172,28 +178,42 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             for(const x of [1.08,2.72])for(const y of [7.08,8.12])box(x,y,.16,.16,34,'#bb946b','#9a7757','#86674d');
             box(1, 7, 2, 1.4, 4, '#bb946b', '#9a7757', '#86674d',34);
 
-            box(1.3,7.8,.85,.3,2,'#c6c3b6','#a6a798','#898f86',38);
-            box(1.4, 7.35, .9, .12, 27, '#414c47', '#34453f', '#53645a', 38);
-            box(1.48, 7.48, .74, .03, 18, '#a0b5a0', '#a0b5a0', '#a0b5a0', 43);
-            box(1.6, 8.7, 1, 1, 19, '#74836d', '#596d57', '#4b5c49');
+            box(1.15,7.7,.5,.55,23,'#d6d0c6','#b6b0a8','#96928d',38);
+            box(1.8,7.18,.95,.52,26,'#c4bebd','#9c959b','#827e89',43);
+            box(1.94,7.72,.68,.025,18,'#44414e','#36343f','#36343f',47);
+            box(2.13,7.35,.23,.22,5,'#b7aaa0','#9c8d80','#827970',38);
+            box(1.8,7.93,.75,.32,2,'#ded9d2','#a9a4a1','#969094',38);
+            for(let row=0;row<3;row++)for(let col=0;col<7;col++)box(1.83+col*.095,7.95+row*.09,.06,.055,.4,'#aaa6a7','#aaa6a7','#aaa6a7',40);
+            box(2.66,7.9,.18,.25,3,'#aba6a5','#918b8a','#797477',38);
             }});
             renderQueue.push({depth:depth(10.3,2.5),draw:()=>{
-            box(9, 1, 2.6, 3, 17, '#b99b79', '#a78b6c', '#927759');
-            box(9, 1, 2.6, .25, 46, '#ba9871', '#b28f69', '#927759');
+            box(9, 1, 2.6, 3, 17, '#b7784d', '#955b3e', '#794832');
+            box(9, 1, 2.6, .25, 46, '#b5784c', '#995d3c', '#774731');
             box(9.1, 1.3, 2.4, 2.6, 11, '#f7f0df', '#e2d9c5', '#c9c2ae', 17);
-            box(9.1, 2.2, 2.4, 1.7, 5, '#d2956f', '#c17f58', '#ad704f', 28);
-            box(9.35, 1.4, 1.8, .6, 6, '#fff9e9', '#e4ddca', '#d6ccba', 28);
+            box(9.1, 2.2, 2.4, 1.7, 5, '#ca7853', '#b86346', '#9b4e3c', 28);
+            for(const px of [9.3,10.4])box(px,1.45,.85,.6,6,'#f5d7af','#dbb68f','#bd9878',28);
+            box(9.12,1.04,2.36,.08,3,'#dd9b66','#dd9b66','#dd9b66',39);
             }});
-            renderQueue.push({depth:depth(7.9,7.7),draw:()=>{
-            box(6.5, 7, 2.8, 1.4, 21, '#a8b298', '#89967d', '#78866f');
-            box(6.5, 7, 2.8, .3, 40, '#a0ad90', '#8d9b7e', '#7a896e');
-            box(6.5, 7, .35, 1.4, 31, '#aeb99d', '#8e9d80', '#78866f');
-            box(8.95, 7, .35, 1.4, 31, '#aeb99d', '#8e9d80', '#78866f');
-            box(7.05, 7.45, .7, .6, 8, '#e4d4b4', '#c5b597', '#c5b597', 22);
+            renderQueue.push({depth:depth(7.9,6.7),draw:()=>{
+                // Solid base, then depth-sorted upholstery: the back/arms hide
+                // cushions correctly from every side of the rotating camera.
+                for(const x of [6.65,8.95])for(const y of [6.12,7.17])
+                    box(x,y,.18,.18,5,'#98775a','#785a42','#684c39');
+                box(6.5,6,2.8,1.4,17,'#9cbea7','#7fa48c','#698d77',5);
+                const pieces=[
+                    {x:6.5,y:6,w:2.8,d:.3,h:36,base:5,top:'#b0d0b8',left:'#89ae95',right:'#709580'},
+                    {x:6.5,y:6.3,w:.32,d:1.1,h:27,base:5,top:'#b0cfb9',left:'#8db299',right:'#719680'},
+                    {x:8.98,y:6.3,w:.32,d:1.1,h:27,base:5,top:'#b0cfb9',left:'#8db299',right:'#719680'},
+                    {x:6.84,y:6.34,w:1.04,d:1.02,h:5,base:22,top:'#b7d5bb',left:'#90b49a',right:'#7b9f88'},
+                    {x:7.92,y:6.34,w:1.02,d:1.02,h:5,base:22,top:'#b7d5bb',left:'#90b49a',right:'#7b9f88'},
+                ];
+                pieces.sort((a,b)=>depth(a.x+a.w/2,a.y+a.d/2)-depth(b.x+b.w/2,b.y+b.d/2));
+                for(const s of pieces)box(s.x,s.y,s.w,s.d,s.h,s.top,s.left,s.right,s.base);
             }});
-            renderQueue.push({depth:depth(7.6,10.1),draw:()=>{
-            box(6.9, 9.6, 1.4, 1, 19, '#c4a17c', '#a58460', '#92704f');
-            box(7.15, 9.8, .55, .4, 3, '#e7e1c6', '#c7c5ac', '#b7b59c', 19);
+            renderQueue.push({depth:depth(7.9,8.6),draw:()=>{
+            for(const tx of [7.28,8.38])for(const ty of [8.18,8.92])box(tx,ty,.14,.14,18,'#bd8052','#945a38','#794830');
+            box(7.2,8.1,1.4,1,4,'#c68a57','#a86a41','#875033',18);
+            box(7.45, 8.3, .55, .4, 3, '#e7e1c6', '#c7c5ac', '#b7b59c', 22);
             }});
             renderQueue.push({depth:depth(6.5,11.25),draw:()=>{
                 box(6, 11, 1, .5, 25, '#b59776', '#987a5a', '#86694e');
@@ -202,12 +222,20 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 const key=()=>{ctx.beginPath();ctx.arc(kx-7,ky-3,6,0,Math.PI*2);ctx.moveTo(kx-1,ky-3);ctx.lineTo(kx+15,ky-3);ctx.moveTo(kx+10,ky-3);ctx.lineTo(kx+10,ky+3);ctx.moveTo(kx+15,ky-3);ctx.lineTo(kx+15,ky+2);ctx.stroke();};
                 key();ctx.strokeStyle='#f3d56e';ctx.lineWidth=3;key();ctx.restore();
             }});
-            const plant = (x: number, y: number) => { if(!drawing){renderQueue.push({depth:depth(x+.32,y+.32),draw:()=>plant(x,y)});return;} box(x, y, .65, .65, 15, '#d1b09a', '#c28f73', '#a97356'); const [px, py] = p(x + .32, y + .32, 17); ctx.strokeStyle = '#617650'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - 32); ctx.stroke(); for (let i = 0; i < 5; i++) {
-                ctx.fillStyle = i % 2 ? '#7f9667' : '#5e7954';
-                ctx.beginPath();ctx.ellipse(px+(i%2?7:-7),py-8-i*5,10,5,i%2?-.6:.6,0,Math.PI*2);ctx.fill();
-            } };
-            plant(10.7, 9.2);
-            plant(.7, 10.5);
+            const plant=(x:number,y:number)=>{
+                if(!drawing){renderQueue.push({depth:depth(x+.32,y+.32),draw:()=>plant(x,y)});return;}
+                const [px,py]=p(x+.32,y+.32);
+                poly([[px-10,py-15],[px+10,py-15],[px+7,py],[px-6,py]],'#b16e51','#714934');
+                poly([[px-12,py-18],[px,py-22],[px+12,py-18],[px+11,py-13],[px,py-10],[px-11,py-14]],'#ce8a64','#714934');
+                poly([[px-8,py-18],[px,py-20],[px+8,py-18],[px,py-15]],'#634d35');
+                for(let i=0;i<7;i++){
+                    const side=i%2?1:-1,tipX=px+side*(12+(i%3)*3),tipY=py-27-i*4;
+                    poly([[px-2,py-18],[px+side*4,py-32],[tipX,tipY-7],[tipX+side*5,tipY-6],[tipX,tipY+2],[px+side*5,py-28],[px+2,py-18]],i%2?'#77945d':'#4f754d','#405b3c');
+                }
+            };
+            plant(11,4.4);
+            plant(.7,10.5);
+            box(7.9,1,.9,.85,24,'#b18a63','#926c4e','#78563e');
             if (g.progression.owned.includes('plant'))
                 plant(7, .8);
             if(g.progression.owned.includes('lamp')){box(8,3,.7,.7,20,'#b59c73','#947c59','#7e694b');box(8.3,3.3,.12,.12,30,'#c9b277','#ad995f','#ad995f',20);box(8.1,3.1,.5,.5,9,'#f4dba1','#d4ba83','#baa16c',48);}
@@ -240,15 +268,20 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 ctx.font = 'bold 8px sans-serif';
                 ctx.fillText('RENT DUE', x - 19, y + 2);
             }
-            if (!g.life.powerOn||(g.ending.kind==='power_cut'||g.ending.kind==='eviction')&&endingElapsed.current>1.5) {
-                ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='rgba(12,20,38,.72)';ctx.fillRect(0,0,ROOM_VIEW.width,ROOM_VIEW.height);ctx.restore();
-            }
             if(g.life.stress>=15){for(let i=0;i<3;i++)box(1+i*.3,7.8,.4,.35,1,'#f7e5d4','#d9b7a1','#d9b7a1',39+i);}
             if (g.life.foodStock < 25||g.ending.kind==='food_shortage') {
                 const [x, y] = p(1, 1.4, 74);
                 ctx.fillStyle = '#77573c';
                 ctx.font = '11px sans-serif';
                 ctx.fillText('Empty', x - 12, y);
+            }
+            // Show only the wall above the tallest furniture (the 68px fridge).
+            ctx.save();
+            ctx.globalAlpha=.1;
+            for(const wall of nearWalls)drawWall(wall,72);
+            ctx.restore();
+            if (!g.life.powerOn||(g.ending.kind==='power_cut'||g.ending.kind==='eviction')&&endingElapsed.current>1.5) {
+                ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='rgba(12,20,38,.72)';ctx.fillRect(0,0,ROOM_VIEW.width,ROOM_VIEW.height);ctx.restore();
             }
             if(g.ending.phase==='playing'&&endingElapsed.current>3){ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=`rgba(25,31,29,${reduced?.55:Math.min(.55,(endingElapsed.current-3)*.18)})`;ctx.fillRect(0,0,ROOM_VIEW.width,ROOM_VIEW.height);ctx.restore();}
             frame = requestAnimationFrame(draw);
@@ -258,7 +291,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     }, []);
     function pointer(e:React.PointerEvent<HTMLCanvasElement>){const r=e.currentTarget.getBoundingClientRect(),z=camera.current.zoom;return {x:((e.clientX-r.left)/r.width*ROOM_VIEW.width-ROOM_VIEW.width/2)/z+360,y:((e.clientY-r.top)/r.height*ROOM_VIEW.height-ROOM_VIEW.height/2)/z+285};}
     function hitAt(x:number,y:number){return [...OBJECTS].sort((a,b)=>projectRoom(b.x,b.y,camera.current.angle).screenY-projectRoom(a.x,a.y,camera.current.angle).screenY).find(o=>{const p=projectRoom(o.x+o.w/2,o.y+o.d/2,camera.current.angle);return Math.abs(x-p.screenX)<34&&y>p.screenY-65&&y<p.screenY+12;});}
-    function inspect(e:React.PointerEvent<HTMLCanvasElement>){if(current.current.isGameOver)return;const {x,y}=pointer(e),hit=hitAt(x,y);pendingInspect.current=hit?.id??null;const p=unprojectRoom(x,y,camera.current.angle);path.current=findPath(avatar.current,hit||{x:p.gridX,y:p.gridY});nextWander.current=performance.now()+10000;}
+    function inspect(e:React.PointerEvent<HTMLCanvasElement>){if(current.current.isGameOver)return;const {x,y}=pointer(e);const hit=hitAt(x,y);pendingInspect.current=hit?.id??null;const p=unprojectRoom(x,y,camera.current.angle);path.current=findPath(avatar.current,hit||{x:p.gridX,y:p.gridY});nextWander.current=performance.now()+10000;}
     function pointerDown(e:React.PointerEvent<HTMLCanvasElement>){if(e.button!==0||!e.isPrimary)return;e.currentTarget.focus({preventScroll:true});drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,rotation:requestedCamera.current.rotation,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}
     function pointerMove(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(d&&d.id===e.pointerId){const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;if(d.moved){setRotation(d.rotation+dx/e.currentTarget.getBoundingClientRect().width*360);hover.current=undefined;e.currentTarget.style.cursor='grabbing';}return;}const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'grab';}
     function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved)inspect(e);}

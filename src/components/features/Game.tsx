@@ -129,7 +129,7 @@ export default function Game() {
     }
     catch {
         setDialog(null);
-        setError('Could not import this file. Choose a valid RoomEconomy JSON save under 2 MB.');
+        setError('Could not import this file. Choose a valid CashBound JSON save under 2 MB.');
     }
     finally {
         e.target.value = '';
@@ -143,7 +143,7 @@ export default function Game() {
     return <div className={`game-world ${!game.life.powerOn?'blackout':''} ${game.life.stress>=35?'stressed':''}`} data-testid="game-world">
       <div className="world-grain" aria-hidden="true"/>
       <header className="game-hud">
-        <div className="world-name"><img className="world-logo" src="/room-economy-mark.svg" width={56} height={56} alt="" aria-hidden="true"/><div><h1>Room<span>Economy</span></h1><p>one room. your whole life.</p></div></div>
+        <div className="world-name"><img className="world-logo" src="/room-economy-mark.svg" width={56} height={56} alt="" aria-hidden="true"/><div><h1>Cash<span>Bound</span></h1><p>one room. your whole life.</p></div></div>
         <div className="vitals" aria-label="Character wellbeing">
           {[{label:'Health',value:game.metrics.health,Icon:Heart,style:'health'},{label:'Entertainment',value:game.metrics.happiness,Icon:Smile,style:'mood'},{label:'Energy',value:game.life.energy,Icon:Battery,style:'energy'}].map(({label,value,Icon,style})=><div className={`vital ${style}`} key={label} title={`${label}: ${Math.round(value)} of 100`}><Icon size={17}/><div role="meter" aria-label={label} aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}><i style={{width:`${value}%`}}/></div><span className="sr-only">{label}: {Math.round(value)}</span></div>)}
         </div>
