@@ -1,0 +1,466 @@
+{
+  "name": "30-day mock checking feed",
+  "description": "Fictional transactions. Import the matching game day once per month; End day advances game time.",
+  "days": [
+    {
+      "day": 1,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-01-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-01",
+          "amount": 1200,
+          "description": "Apartment rent",
+          "category": "housing",
+          "kind": "purchase"
+        },
+        {
+          "id": "mock-month-1-day-01-2",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-01",
+          "amount": 48,
+          "description": "Weekly grocery shop",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 2,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-02-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-02",
+          "amount": 100,
+          "description": "Electricity and internet bill",
+          "category": "utilities",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 3,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-03-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-03",
+          "amount": 18,
+          "description": "Transit pass top-up",
+          "category": "transit",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 4,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-04-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-04",
+          "amount": 35,
+          "description": "Gym membership",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 5,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-05-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-05",
+          "amount": 30,
+          "description": "Pharmacy essentials",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 6,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-06-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-06",
+          "amount": 100,
+          "description": "Transfer to savings",
+          "category": "savings",
+          "kind": "saving"
+        }
+      ]
+    },
+    {
+      "day": 7,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-07-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-07",
+          "amount": 48,
+          "description": "Weekly grocery shop",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 8,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-08-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-08",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 9,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-09-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-09",
+          "amount": 18,
+          "description": "Transit pass top-up",
+          "category": "transit",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 10,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-10-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-10",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 11,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-11-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-11",
+          "amount": 8.5,
+          "description": "Cafe lunch",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 12,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-12-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-12",
+          "amount": 100,
+          "description": "Transfer to savings",
+          "category": "savings",
+          "kind": "saving"
+        }
+      ]
+    },
+    {
+      "day": 13,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-13-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-13",
+          "amount": 48,
+          "description": "Weekly grocery shop",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 14,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-14-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-14",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 15,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-15-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-15",
+          "amount": 18,
+          "description": "Transit pass top-up",
+          "category": "transit",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 16,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-16-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-16",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 17,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-17-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-17",
+          "amount": 8.5,
+          "description": "Cafe lunch",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 18,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-18-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-18",
+          "amount": 100,
+          "description": "Transfer to savings",
+          "category": "savings",
+          "kind": "saving"
+        }
+      ]
+    },
+    {
+      "day": 19,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-19-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-19",
+          "amount": 48,
+          "description": "Weekly grocery shop",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 20,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-20-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-20",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 21,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-21-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-21",
+          "amount": 18,
+          "description": "Transit pass top-up",
+          "category": "transit",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 22,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-22-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-22",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 23,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-23-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-23",
+          "amount": 8.5,
+          "description": "Cafe lunch",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 24,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-24-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-24",
+          "amount": 100,
+          "description": "Transfer to savings",
+          "category": "savings",
+          "kind": "saving"
+        }
+      ]
+    },
+    {
+      "day": 25,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-25-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-25",
+          "amount": 48,
+          "description": "Weekly grocery shop",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 26,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-26-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-26",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 27,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-27-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-27",
+          "amount": 18,
+          "description": "Transit pass top-up",
+          "category": "transit",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 28,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-28-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-28",
+          "amount": 12,
+          "description": "Movie night",
+          "category": "leisure",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 29,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-29-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-29",
+          "amount": 8.5,
+          "description": "Cafe lunch",
+          "category": "food",
+          "kind": "purchase"
+        }
+      ]
+    },
+    {
+      "day": 30,
+      "transactions": [
+        {
+          "id": "mock-month-1-day-30-1",
+          "payerId": "mock-checking",
+          "medium": "balance",
+          "paymentDate": "2026-09-30",
+          "amount": 100,
+          "description": "Transfer to savings",
+          "category": "savings",
+          "kind": "saving"
+        }
+      ]
+    }
+  ]
+}

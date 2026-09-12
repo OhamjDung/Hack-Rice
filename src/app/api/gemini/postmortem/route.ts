@@ -1,3 +1,4 @@
+export const maxDuration = 50;
 import { adviceInput } from '@/schemas/api';
 import { analyzeGame } from '@/lib/geminiClient';
 export async function POST(req: Request) { const input = adviceInput.safeParse(await req.json().catch(() => null)); if (!input.success)

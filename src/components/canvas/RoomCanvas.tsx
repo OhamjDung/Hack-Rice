@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameState, CategoryKey, BankTransaction, PlayerCharacter } from '@/engine/Types';
 import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
-import { OBJECTS, projectRoom, unprojectRoom, findPath } from './IsometricEngine';
+import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath } from './IsometricEngine';
 export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, paused=false }: {
     game: GameState;
     onInspect: (c: CategoryKey | 'desk') => void;
@@ -27,9 +27,11 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
         x: number;
         y: number;
     }[]>([]);
-    const [zoom, setZoom] = useState(1);
+    const [zoom, setZoom] = useState(1.1);
     const [rotation,setRotation]=useState(0);
-    const camera=useRef({angle:0,zoom:1});
+    const camera=useRef({angle:0,zoom:1.1});
+    const requestedCamera=useRef({rotation,zoom});requestedCamera.current={rotation,zoom};
+    const drag=useRef<{id:number;x:number;y:number;rotation:number;moved:boolean}|null>(null);
     const inspectCallback=useRef(onInspect);inspectCallback.current=onInspect;
     const pendingInspect=useRef<CategoryKey|'desk'|null>(null);
     const hover=useRef<typeof OBJECTS[number]|undefined>(undefined);
@@ -39,11 +41,11 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     useEffect(()=>{
         if(game.ending.phase!=='playing')return;
         endingElapsed.current=0;endingNotified.current=false;queue.current=[];
-        path.current=findPath(avatar.current,game.ending.kind==='food_shortage'?{x:3,y:3}:game.ending.kind==='power_cut'||game.ending.kind==='eviction'?{x:2,y:5}:{x:7,y:5});activity.current='worried';
+        path.current=findPath(avatar.current,game.ending.kind==='food_shortage'?{x:2,y:2}:game.ending.kind==='power_cut'||game.ending.kind==='eviction'?{x:2,y:5}:{x:7,y:5});activity.current='worried';
     },[game.ending.phase,game.ending.kind]);
     useEffect(()=>{
         if(game.isGameOver||game.command.severity==='info')return;
-        const target=game.command.behavior==='tired'?{x:3,y:7}:{x:8,y:2};
+        const target=game.command.behavior==='tired'?{x:8,y:2}:{x:8,y:2};
         path.current=findPath(avatar.current,target);activity.current=game.command.behavior==='tired'?'sleeping':'worried';
         sceneUntil.current=performance.now()+3500;nextWander.current=performance.now()+5000;
     },[game.command.message,game.command.behavior,game.command.day,game.isGameOver]);
@@ -61,8 +63,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             const dt = Math.min((time - last) / 1000, .04);
             last = time;
             const g = current.current;
-            camera.current.angle+=(rotation*Math.PI/180-camera.current.angle)*(reduced?1:Math.min(1,dt*9));
-            camera.current.zoom+=(zoom-camera.current.zoom)*(reduced?1:Math.min(1,dt*10));
+            camera.current.angle+=(requestedCamera.current.rotation*Math.PI/180-camera.current.angle)*(reduced?1:Math.min(1,dt*9));
+            camera.current.zoom+=(requestedCamera.current.zoom-camera.current.zoom)*(reduced?1:Math.min(1,dt*10));
             const angle=camera.current.angle;
             const a = avatar.current;
             if(pauseRef.current&&g.ending.phase!=='playing'){last=time;frame=requestAnimationFrame(draw);return;}
@@ -78,7 +80,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             if(!pendingInspect.current&&!path.current.length&&time>sceneUntil.current&&!g.isGameOver){
                 const event=queue.current.shift();
                 if(event){const scene=transactionScene(event);path.current=findPath(a,scene.target);activity.current=scene.activity;sceneUntil.current=time+7000;sceneCallback.current?.(scene.line);nextWander.current=time+10000;}
-                else if(time>nextWander.current){const warning=g.command.severity!=='info';const target=warning?(g.command.behavior==='tired'?{x:3,y:7}:Math.floor(time/5000)%2?{x:8,y:2}:{x:5,y:4}):g.life.foodStock<25?{x:3,y:3}:g.life.energy<30?{x:3,y:7}:g.life.stress>=35?{x:8,y:2}:[{x:5,y:4},{x:9,y:9},{x:3,y:7}][Math.floor(time/10000)%3];path.current=findPath(a,target);activity.current=warning?(g.command.behavior==='tired'?'sleeping':'worried'):g.life.energy<30?'sleeping':'idle';nextWander.current=time+(warning?5000:12000);}
+                else if(time>nextWander.current){const warning=g.command.severity!=='info';const target=warning?(g.command.behavior==='tired'?{x:8,y:2}:Math.floor(time/5000)%2?{x:8,y:2}:{x:5,y:4}):g.life.foodStock<25?{x:2,y:2}:g.life.energy<30?{x:8,y:2}:g.life.stress>=35?{x:8,y:2}:[{x:5,y:4},{x:6,y:9},{x:8,y:2}][Math.floor(time/10000)%3];path.current=findPath(a,target);activity.current=warning?(g.command.behavior==='tired'?'sleeping':'worried'):g.life.energy<30?'sleeping':'idle';nextWander.current=time+(warning?10000:18000);}
             }
             const target = path.current[0];
             if (target) {
@@ -89,23 +91,25 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                     path.current.shift();
                 }
                 else {
-                    const speed=g.life.energy<30?1.2:3;
-                    a.x += dx / d * dt * speed;
-                    a.y += dy / d * dt * speed;
+                    const speed=g.life.energy<30?.3:.7;
+                    a.x += dx / d * Math.min(d, dt * speed);
+                    a.y += dy / d * Math.min(d, dt * speed);
                 }
             }
             if (a.z > 0) {
                 a.v += dt * 850;
                 a.z = reduced ? 0 : Math.max(0, a.z - a.v * dt);
             }
+            // Render the original smooth room at the display resolution.
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            if (canvas.width !== 720 * dpr) {
-                canvas.width = 720 * dpr;
-                canvas.height = 520 * dpr;
+            if (canvas.width !== Math.round(ROOM_VIEW.width * dpr)) {
+                canvas.width = Math.round(ROOM_VIEW.width * dpr);
+                canvas.height = Math.round(ROOM_VIEW.height * dpr);
             }
+            ctx.imageSmoothingEnabled=true;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            ctx.clearRect(0, 0, 720, 520);
-            ctx.translate(360, 285);
+            ctx.clearRect(0, 0, ROOM_VIEW.width, ROOM_VIEW.height);
+            ctx.translate(ROOM_VIEW.width/2, ROOM_VIEW.height/2);
             ctx.scale(camera.current.zoom, camera.current.zoom);
             ctx.translate(-360, -285);
             const p = (x: number, y: number, z = 0) => { const t = projectRoom(x, y, angle); return [t.screenX, t.screenY - z] as const; };
@@ -125,7 +129,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 poly([p(x,y,h+base),p(x+w,y,h+base),p(x+w,y+d,h+base),p(x,y+d,h+base)],top);
             };
             ctx.save();
-            ctx.filter = 'blur(16px)';
+            ctx.filter='blur(6px)';ctx.globalAlpha=.4;
             poly([p(0, 0, -25), p(12, 0, -25), p(12, 12, -25), p(0, 12, -25)], '#cbc7b8');
             ctx.restore();
             box(0, 0, 12, 12, 12, '#cabc9f', '#b1a386', '#978e77', -12);
@@ -146,44 +150,67 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             poly([p(0, 6.15, 78), p(0, 7.35, 78), p(0, 7.35, 47), p(0, 6.15, 47)], '#f4e9cd');
             ctx.restore();
             // Rug and furniture, in back-to-front order.
-            poly([p(5, 4.5), p(10.5, 4.5), p(10.5, 9.8), p(5, 9.8)], '#9ba994');
-            poly([p(5.25, 4.75), p(10.25, 4.75), p(10.25, 9.55), p(5.25, 9.55)], g.progression.owned.includes('rug')?'#c58665':'#b4bea5');
+            poly([p(5.9, 6.3), p(10, 6.3), p(10, 11), p(5.9, 11)], '#9ba994');
+            poly([p(6.15, 6.55), p(9.75, 6.55), p(9.75, 10.75), p(6.15, 10.75)], g.progression.owned.includes('rug')?'#c58665':'#b4bea5');
             furnitureMode=true;
-            box(2, 2, 1.2, 1.2, 68, '#f7f4e7', '#e9e6d9', '#c4c7b9');
-            box(3.21, 2.5, .04, .12, 17, '#7d8879', '#7d8879', '#7d8879', 20);
-            box(2, 2, 1.21, 1.21, 1, '#b7b9aa', '#b7b9aa', '#b7b9aa', 44);
+            renderQueue.push({depth:depth(0.6,2),draw:()=>{
+            box(0, 1.4, 1.2, 1.2, 68, '#f7f4e7', '#e9e6d9', '#c4c7b9');
+            box(1.21, 1.9, .04, .12, 17, '#7d8879', '#7d8879', '#7d8879', 20);
+            poly([p(1.21,1.4,44),p(1.21,2.6,44),p(1.21,2.6,42),p(1.21,1.4,42)],'#8b8179');
+            poly([p(0,2.61,44),p(1.2,2.61,44),p(1.2,2.61,42),p(0,2.61,42)],'#8b8179');
+            }});
+            renderQueue.push({depth:depth(0.6,4.2),draw:()=>{
             box(0, 3, 1.2, 2.4, 34, '#ece9dc', '#c5b496', '#b19b7e');
-            box(.2, 3.3, .7, .8, 2, '#929f9a', '#929f9a', '#929f9a', 34);
-            box(.2, 4.45, .7, .7, 2, '#444e46', '#444e46', '#444e46', 34);
-            box(9, 1, 2, 1.4, 38, '#bb946b', '#9a7757', '#86674d');
-            box(9.4, 1.35, .9, .12, 27, '#414c47', '#34453f', '#53645a', 38);
-            box(9.48, 1.48, .74, .03, 18, '#a0b5a0', '#a0b5a0', '#a0b5a0', 43);
-            box(9.6, 3, 1, 1, 19, '#74836d', '#596d57', '#4b5c49');
-            box(2, 8, 2.6, 3, 17, '#b99b79', '#a78b6c', '#927759');
-            box(2, 8, 2.6, .25, 46, '#ba9871', '#b28f69', '#927759');
-            box(2.1, 8.3, 2.4, 2.6, 11, '#f7f0df', '#e2d9c5', '#c9c2ae', 17);
-            box(2.1, 9.2, 2.4, 1.7, 5, '#d2956f', '#c17f58', '#ad704f', 28);
-            box(2.35, 8.4, 1.8, .6, 6, '#fff9e9', '#e4ddca', '#d6ccba', 28);
-            box(8, 7, 2.8, 1.4, 21, '#a8b298', '#89967d', '#78866f');
-            box(8, 7, 2.8, .3, 40, '#a0ad90', '#8d9b7e', '#7a896e');
-            box(8, 7, .35, 1.4, 31, '#aeb99d', '#8e9d80', '#78866f');
-            box(10.45, 7, .35, 1.4, 31, '#aeb99d', '#8e9d80', '#78866f');
-            box(8.55, 7.45, .7, .6, 8, '#e4d4b4', '#c5b597', '#c5b597', 22);
-            box(6, 6, 1.4, 1, 19, '#c4a17c', '#a58460', '#92704f');
-            box(6.25, 6.2, .55, .4, 3, '#e7e1c6', '#c7c5ac', '#b7b59c', 19);
-            box(6, 11, 1, .5, 25, '#b59776', '#987a5a', '#86694e');
-            box(6.3, 11.1, .25, .15, 3, '#dbc15e', '#a49144', '#a49144', 25);
+            box(0.2, 3.3, .7, .8, 2, '#929f9a', '#929f9a', '#929f9a', 34);
+            box(0.2, 4.45, .7, .7, 2, '#444e46', '#444e46', '#444e46', 34);
+            // Oven door and hob details on the kitchen block.
+            box(1.21,4.5,.03,.65,18,'#60544d','#453f40','#453f40',8);
+            box(1.24,4.57,.04,.5,2,'#d2c7b1','#d2c7b1','#d2c7b1',26);
+            for(const x of [.3,.65])for(const y of [4.55,4.85])box(x,y,.22,.2,1,'#77747d','#4b474e','#4b474e',36);
+            }});
+            renderQueue.push({depth:depth(2,7.7),draw:()=>{
+            for(const x of [1.08,2.72])for(const y of [7.08,8.12])box(x,y,.16,.16,34,'#bb946b','#9a7757','#86674d');
+            box(1, 7, 2, 1.4, 4, '#bb946b', '#9a7757', '#86674d',34);
+
+            box(1.3,7.8,.85,.3,2,'#c6c3b6','#a6a798','#898f86',38);
+            box(1.4, 7.35, .9, .12, 27, '#414c47', '#34453f', '#53645a', 38);
+            box(1.48, 7.48, .74, .03, 18, '#a0b5a0', '#a0b5a0', '#a0b5a0', 43);
+            box(1.6, 8.7, 1, 1, 19, '#74836d', '#596d57', '#4b5c49');
+            }});
+            renderQueue.push({depth:depth(10.3,2.5),draw:()=>{
+            box(9, 1, 2.6, 3, 17, '#b99b79', '#a78b6c', '#927759');
+            box(9, 1, 2.6, .25, 46, '#ba9871', '#b28f69', '#927759');
+            box(9.1, 1.3, 2.4, 2.6, 11, '#f7f0df', '#e2d9c5', '#c9c2ae', 17);
+            box(9.1, 2.2, 2.4, 1.7, 5, '#d2956f', '#c17f58', '#ad704f', 28);
+            box(9.35, 1.4, 1.8, .6, 6, '#fff9e9', '#e4ddca', '#d6ccba', 28);
+            }});
+            renderQueue.push({depth:depth(7.9,7.7),draw:()=>{
+            box(6.5, 7, 2.8, 1.4, 21, '#a8b298', '#89967d', '#78866f');
+            box(6.5, 7, 2.8, .3, 40, '#a0ad90', '#8d9b7e', '#7a896e');
+            box(6.5, 7, .35, 1.4, 31, '#aeb99d', '#8e9d80', '#78866f');
+            box(8.95, 7, .35, 1.4, 31, '#aeb99d', '#8e9d80', '#78866f');
+            box(7.05, 7.45, .7, .6, 8, '#e4d4b4', '#c5b597', '#c5b597', 22);
+            }});
+            renderQueue.push({depth:depth(7.6,10.1),draw:()=>{
+            box(6.9, 9.6, 1.4, 1, 19, '#c4a17c', '#a58460', '#92704f');
+            box(7.15, 9.8, .55, .4, 3, '#e7e1c6', '#c7c5ac', '#b7b59c', 19);
+            }});
+            renderQueue.push({depth:depth(6.5,11.25),draw:()=>{
+                box(6, 11, 1, .5, 25, '#b59776', '#987a5a', '#86694e');
+                const [kx,ky]=p(6.45,11.25,29);
+                ctx.save();ctx.strokeStyle='#72501d';ctx.lineWidth=7;ctx.lineCap='round';
+                const key=()=>{ctx.beginPath();ctx.arc(kx-7,ky-3,6,0,Math.PI*2);ctx.moveTo(kx-1,ky-3);ctx.lineTo(kx+15,ky-3);ctx.moveTo(kx+10,ky-3);ctx.lineTo(kx+10,ky+3);ctx.moveTo(kx+15,ky-3);ctx.lineTo(kx+15,ky+2);ctx.stroke();};
+                key();ctx.strokeStyle='#f3d56e';ctx.lineWidth=3;key();ctx.restore();
+            }});
             const plant = (x: number, y: number) => { if(!drawing){renderQueue.push({depth:depth(x+.32,y+.32),draw:()=>plant(x,y)});return;} box(x, y, .65, .65, 15, '#d1b09a', '#c28f73', '#a97356'); const [px, py] = p(x + .32, y + .32, 17); ctx.strokeStyle = '#617650'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - 32); ctx.stroke(); for (let i = 0; i < 5; i++) {
                 ctx.fillStyle = i % 2 ? '#7f9667' : '#5e7954';
-                ctx.beginPath();
-                ctx.ellipse(px + (i % 2 ? 7 : -7), py - 8 - i * 5, 10, 5, i % 2 ? -.6 : .6, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath();ctx.ellipse(px+(i%2?7:-7),py-8-i*5,10,5,i%2?-.6:.6,0,Math.PI*2);ctx.fill();
             } };
-            plant(10.7, 4.2);
+            plant(10.7, 9.2);
             plant(.7, 10.5);
             if (g.progression.owned.includes('plant'))
                 plant(7, .8);
-            if(g.progression.owned.includes('lamp')){box(1,7,.7,.7,20,'#b59c73','#947c59','#7e694b');box(1.3,7.3,.12,.12,30,'#c9b277','#ad995f','#ad995f',20);box(1.1,7.1,.5,.5,9,'#f4dba1','#d4ba83','#baa16c',48);}
+            if(g.progression.owned.includes('lamp')){box(8,3,.7,.7,20,'#b59c73','#947c59','#7e694b');box(8.3,3.3,.12,.12,30,'#c9b277','#ad995f','#ad995f',20);box(8.1,3.1,.5,.5,9,'#f4dba1','#d4ba83','#baa16c',48);}
             if(g.progression.owned.includes('bookshelf')){box(7,0,1.6,.55,62,'#b58d64','#94704f','#7b5c41');for(let i=0;i<6;i++)box(7.1+i*.2,.5,.13,.12,16,i%2?'#839479':'#c89470','#a28463','#a28463',14);}
             const pos = p(a.x + .5, a.y + .5);
             renderQueue.push({depth:depth(a.x+.5,a.y+.5),draw:()=>{
@@ -206,7 +233,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 ctx.fillText(caption, pos[0] - width / 2, pos[1] - 69);
             }
             if (g.housingDeficits||g.ending.kind==='eviction') {
-                const [x, y] = p(2, 8, 56);
+                const [x, y] = p(9, 1, 56);
                 ctx.fillStyle = '#fff0da';
                 ctx.fillRect(x - 22, y - 12, 44, 22);
                 ctx.fillStyle = '#ab493c';
@@ -214,23 +241,27 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 ctx.fillText('RENT DUE', x - 19, y + 2);
             }
             if (!g.life.powerOn||(g.ending.kind==='power_cut'||g.ending.kind==='eviction')&&endingElapsed.current>1.5) {
-                ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='rgba(12,20,38,.72)';ctx.fillRect(0,0,720,520);ctx.restore();
+                ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='rgba(12,20,38,.72)';ctx.fillRect(0,0,ROOM_VIEW.width,ROOM_VIEW.height);ctx.restore();
             }
-            if(g.life.stress>=15){for(let i=0;i<3;i++)box(9+i*.3,1.8,.4,.35,1,'#f7e5d4','#d9b7a1','#d9b7a1',39+i);}
+            if(g.life.stress>=15){for(let i=0;i<3;i++)box(1+i*.3,7.8,.4,.35,1,'#f7e5d4','#d9b7a1','#d9b7a1',39+i);}
             if (g.life.foodStock < 25||g.ending.kind==='food_shortage') {
-                const [x, y] = p(3, 2, 74);
+                const [x, y] = p(1, 1.4, 74);
                 ctx.fillStyle = '#77573c';
                 ctx.font = '11px sans-serif';
                 ctx.fillText('Empty', x - 12, y);
             }
-            if(g.ending.phase==='playing'&&endingElapsed.current>3){ctx.fillStyle=`rgba(25,31,29,${reduced?.55:Math.min(.55,(endingElapsed.current-3)*.18)})`;ctx.fillRect(0,0,720,520);}
+            if(g.ending.phase==='playing'&&endingElapsed.current>3){ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=`rgba(25,31,29,${reduced?.55:Math.min(.55,(endingElapsed.current-3)*.18)})`;ctx.fillRect(0,0,ROOM_VIEW.width,ROOM_VIEW.height);ctx.restore();}
             frame = requestAnimationFrame(draw);
         };
         frame = requestAnimationFrame(draw);
         return () => cancelAnimationFrame(frame);
-    }, [zoom,rotation]);
-    function pointer(e:React.MouseEvent<HTMLCanvasElement>){const r=e.currentTarget.getBoundingClientRect(),z=camera.current.zoom;return {x:((e.clientX-r.left)/r.width*720-360)/z+360,y:((e.clientY-r.top)/r.height*520-285)/z+285};}
+    }, []);
+    function pointer(e:React.PointerEvent<HTMLCanvasElement>){const r=e.currentTarget.getBoundingClientRect(),z=camera.current.zoom;return {x:((e.clientX-r.left)/r.width*ROOM_VIEW.width-ROOM_VIEW.width/2)/z+360,y:((e.clientY-r.top)/r.height*ROOM_VIEW.height-ROOM_VIEW.height/2)/z+285};}
     function hitAt(x:number,y:number){return [...OBJECTS].sort((a,b)=>projectRoom(b.x,b.y,camera.current.angle).screenY-projectRoom(a.x,a.y,camera.current.angle).screenY).find(o=>{const p=projectRoom(o.x+o.w/2,o.y+o.d/2,camera.current.angle);return Math.abs(x-p.screenX)<34&&y>p.screenY-65&&y<p.screenY+12;});}
-    function click(e:React.MouseEvent<HTMLCanvasElement>){if(current.current.isGameOver)return;const {x,y}=pointer(e),hit=hitAt(x,y);pendingInspect.current=hit?.id??null;const p=unprojectRoom(x,y,camera.current.angle);path.current=findPath(avatar.current,hit||{x:p.gridX,y:p.gridY});nextWander.current=performance.now()+10000;}
-    return <div className="room-scene"><canvas ref={ref} onClick={click} onMouseMove={e=>{const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'crosshair';}} onMouseLeave={()=>{hover.current=undefined;}} aria-label="Your rotatable apartment. Click furniture to walk over and interact." role="img"/><div className="scene-controls" aria-label="Room camera"><button aria-label="Rotate room left" onClick={()=>setRotation(r=>r-45)}>↶</button><span>{((rotation%360)+360)%360}°</span><button aria-label="Rotate room right" onClick={()=>setRotation(r=>r+45)}>↷</button><button aria-label="Reset room view" onClick={()=>{setRotation(0);setZoom(1);}}>Reset</button><button aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(.8,z-.1))} disabled={zoom<=.8}>−</button><span>{Math.round(zoom*100)}%</span><button aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(1.3,z+.1))} disabled={zoom>=1.3}>+</button></div></div>;
+    function inspect(e:React.PointerEvent<HTMLCanvasElement>){if(current.current.isGameOver)return;const {x,y}=pointer(e),hit=hitAt(x,y);pendingInspect.current=hit?.id??null;const p=unprojectRoom(x,y,camera.current.angle);path.current=findPath(avatar.current,hit||{x:p.gridX,y:p.gridY});nextWander.current=performance.now()+10000;}
+    function pointerDown(e:React.PointerEvent<HTMLCanvasElement>){if(e.button!==0||!e.isPrimary)return;e.currentTarget.focus({preventScroll:true});drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,rotation:requestedCamera.current.rotation,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}
+    function pointerMove(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(d&&d.id===e.pointerId){const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;if(d.moved){setRotation(d.rotation+dx/e.currentTarget.getBoundingClientRect().width*360);hover.current=undefined;e.currentTarget.style.cursor='grabbing';}return;}const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'grab';}
+    function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved)inspect(e);}
+    function cancelDrag(){drag.current=null;}
+    return <div className="room-scene"><canvas ref={ref} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag} onPointerLeave={()=>{hover.current=undefined;}} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setRotation(r=>r+(e.key==='ArrowLeft'?-15:15));}if(e.key==='Home'){e.preventDefault();setRotation(0);}}} tabIndex={0} aria-label="Apartment. Hold and drag to rotate; click furniture to interact. Arrow keys rotate; Home resets." aria-keyshortcuts="ArrowLeft ArrowRight Home" role="img"/><div className="scene-controls" aria-label="Room camera"><span className="camera-hint">Drag to turn</span><output aria-label="Room angle">{Math.round(((rotation%360)+360)%360)}°</output><button aria-label="Reset room view" onClick={()=>{setRotation(0);setZoom(1.1);}}>Reset</button><button aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(.8,Math.round((z-.1)*10)/10))} disabled={zoom<=.8}>−</button><span>{Math.round(zoom*100)}%</span><button aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(ROOM_VIEW.maxZoom,Math.round((z+.1)*10)/10))} disabled={zoom>=ROOM_VIEW.maxZoom}>+</button></div></div>;
 }

@@ -1,3 +1,4 @@
+export const maxDuration = 50;
 import { auditInput } from '@/schemas/api';
 import { auditInitialBudget } from '@/lib/geminiClient';
 export async function POST(req: Request) { const input = auditInput.safeParse(await req.json().catch(() => null)); if (!input.success)

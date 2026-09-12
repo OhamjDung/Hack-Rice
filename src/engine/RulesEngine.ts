@@ -1,7 +1,7 @@
 import {rewardVerifiedMissions,verifiedPurpose} from './Progression.ts';
 import { categories, type GameState, type Profile, type BankTransaction, type CategoryKey } from './Types.ts';
 import { CATEGORY_META, DEFAULT_PROFILE } from './Constants.ts';
-import { DAYS_PER_MONTH,dayOfMonth } from './DailyReview.ts';
+import { DAYS_PER_MONTH,dayOfMonth,localDailyReview } from './DailyReview.ts';
 import { INITIAL_LIFE, transactionScene } from './Life.ts';
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -13,11 +13,11 @@ export function careForHome(state:GameState,action:'rest'|'tidy'):GameState {
     if(action==='rest'){
         s.life.energy=clamp(s.life.energy+(s.life.foodStock>0?15:3));
         if(s.life.foodStock>=25)s.metrics.health=clamp(s.metrics.health+3);
-        s.player.state='sleeping';s.player.targetPosition={x:3,y:7};
+        s.player.state='sleeping';s.player.targetPosition={x:8,y:2};
         s.life.lastEvent=s.life.foodStock>0?'An early night. Finally, a little energy back.':'I tried to sleep, but it is hard on an empty stomach.';
     } else {
         s.life.clutter=Math.max(0,s.life.clutter-2);s.life.stress=clamp(s.life.stress-5);
-        s.player.state='working';s.player.targetPosition={x:9,y:9};s.life.lastEvent='A few boxes put away. A little more space to breathe. The bills still need a plan.';
+        s.player.state='working';s.player.targetPosition={x:6,y:9};s.life.lastEvent='A few boxes put away. A little more space to breathe. The bills still need a plan.';
     }
     return s;
 }
@@ -25,7 +25,7 @@ export function createGame(profile: Profile = DEFAULT_PROFILE): GameState {
     const jar = (category: CategoryKey) => ({ category, allocatedAmount: profile.allocations[category], spentAmount: 0, rolloverAmount: 0, minViableSpend: CATEGORY_META[category].minimum });
     return { version: 2,progression:{coins:0,claimed:[],owned:[],coinLog:[]},dialogue:[],ending:{phase:'none',kind:'none',reason:''}, reviews:[],command:{message:'',severity:'info',behavior:'calm',day:0}, life:{...INITIAL_LIFE}, profile, player: { ...profile, position: { x: 6, y: 6, z: 300 }, targetPosition: null, state: 'idle' }, metrics: { health: 100, happiness: 80, cashBalance: profile.income, debtBalance: 0, turn: 1, roomLevel: 1 }, jars: { food: jar('food'), housing: jar('housing'), transit: jar('transit'), leisure: jar('leisure'), utilities: jar('utilities'), savings: jar('savings') }, transactions: [], advisorLog: [{ timestamp: 0, severity: 'info', message: 'A fresh apartment. A fresh start. Give every dollar a place to call home.', actionablePlan: ['Cover your essentials first.', 'Put something aside for future you.'] }], isGameOver: false, housingDeficits: 0, savedTotal: 0, completedMonths: 0, mode: 'demo' };
 }
-export function applyTransactions(state: GameState, transactions: BankTransaction[], authoritativeBalance?: number, origin: 'manual'|'nessie'='manual'): GameState {
+export function applyTransactions(state: GameState, transactions: BankTransaction[], authoritativeBalance?: number, origin: 'manual'|'nessie'|'mock'='manual'): GameState {
     if (state.isGameOver)
         return state;
     const s = structuredClone(state);
@@ -33,8 +33,12 @@ export function applyTransactions(state: GameState, transactions: BankTransactio
     for (const t of transactions) {
         if (seen.has(t.id))
             continue;
+        if(t.kind==='purchase' && (!s.rewindCheckpoint || localDailyReview(s,'preview').analysis.ending==='none')) {
+            const {rewindCheckpoint, ...checkpoint}=structuredClone(s);
+            s.rewindCheckpoint=checkpoint;
+        }
         seen.add(t.id);
-        s.transactions.unshift({...t,origin,purpose:origin==='nessie'?verifiedPurpose(t):undefined,gameDay:t.gameDay??s.metrics.turn});
+        s.transactions.unshift({...t,origin,purpose:origin!=='manual'?verifiedPurpose(t):undefined,gameDay:t.gameDay??s.metrics.turn});
         if (t.kind === 'income')
             s.metrics.cashBalance += t.amount;
         else {
@@ -71,7 +75,7 @@ export function applyTransactions(state: GameState, transactions: BankTransactio
         s.player.state='dead';
         s.gameOverReason = 'Bankruptcy: your checking balance fell below −$1,000.';
     }
-    return origin==='nessie'?rewardVerifiedMissions(s):s;
+    return origin!=='manual'?rewardVerifiedMissions(s):s;
 }
 
 export function advanceTurn(state: GameState): GameState {
