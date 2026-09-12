@@ -1,0 +1,90 @@
+/* Bookkeeping mid-game loop — dark world-surface palette, per midgame/STYLEGUIDE.md.
+   Self-scoped under .mg-* so nothing here can collide with src/app/game.css. */
+
+.mg-root {
+  min-height: 100vh;
+  background: #27322d;
+  color: #f5f1e7;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mg-topbar h1 { font-size: 20px; font-weight: 500; margin: 4px 0 0; color: #f5f1e7; }
+.mg-eyebrow { font-size: 11px; letter-spacing: 1.65px; font-weight: 600; color: #c5d0bf; text-transform: uppercase; }
+.mg-muted { color: #c1cbb9; font-size: 12px; }
+.mg-error { color: #fff0ce; }
+
+.mg-panel {
+  background: #344238;
+  border: 1px solid #68785f;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.mg-lockscreen { max-width: 420px; display: flex; flex-direction: column; gap: 9px; }
+
+.mg-track { height: 10px; border-radius: 5px; background: #27322d; overflow: hidden; margin: 4px 0; }
+.mg-track-fill { height: 100%; background: #d4dfc7; transition: width 200ms; }
+.mg-track-fill.mood { background: #acc695; }
+
+.mg-hud { display: flex; flex-direction: column; gap: 13px; }
+.mg-vital { display: flex; flex-direction: column; gap: 6px; }
+
+.mg-debuffs { display: flex; gap: 7px; flex-wrap: wrap; }
+.mg-debuff-chip {
+  font-size: 11px; font-weight: 600;
+  color: #fff0ce; background: #604320; border: 1px solid #e4ab56;
+  border-radius: 7px; padding: 5px 9px;
+}
+
+.mg-buckets { display: flex; gap: 17px; flex-wrap: wrap; font-size: 12px; color: #edf2e7; }
+.mg-buckets b { font-variant-numeric: tabular-nums; color: #f5f1e7; }
+
+.mg-hud-actions { display: flex; align-items: center; gap: 17px; flex-wrap: wrap; }
+.mg-automation-row { display: flex; gap: 13px; font-size: 11px; color: #c5d0bf; }
+.mg-automation-row label { display: flex; align-items: center; gap: 5px; }
+
+.mg-streak { color: #e7dca0; font-size: 12px; font-weight: 600; }
+
+.mg-button {
+  display: inline-flex; align-items: center; gap: 9px; min-height: 39px;
+  padding: 10px 15px; border-radius: 7px; font-size: 11px; font-weight: 600;
+  border: 1px solid transparent; cursor: pointer;
+}
+.mg-button:disabled { opacity: .5; cursor: not-allowed; }
+.mg-button:active:not(:disabled) { transform: translateY(1px); }
+.mg-primary { background: #d4dcb6; border-color: #d4dcb6; color: #283622; }
+.mg-primary:hover:not(:disabled) { background: #edf1d8; }
+.mg-secondary { background: #41513c; border-color: #68785f; color: #edf2e7; }
+.mg-secondary:hover:not(:disabled) { background: #506148; }
+.mg-text-button { background: transparent; color: #d4dfc7; text-decoration: underline; }
+
+.mg-log { font-size: 11px; color: #c1cbb9; display: flex; flex-direction: column; gap: 3px; }
+
+.mg-modal {
+  width: 560px; max-width: calc(100vw - 32px); border-radius: 16px;
+  border: 1px solid #e2e7d8; background: #fcfcf8; color: #303a32;
+  box-shadow: 0 24px 90px #28332233; padding: 24px;
+}
+.mg-modal::backdrop { background: #25311fd0; backdrop-filter: blur(4px); }
+.mg-modal h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 25px; font-weight: 400; margin: 0 0 9px; }
+.mg-modal label { display: flex; flex-direction: column; gap: 7px; font-size: 11px; font-weight: 500; color: #68745b; margin-bottom: 14px; }
+.mg-modal input[type=number] {
+  padding: 10px 12px; border: 1px solid #d9dfcf; border-radius: 7px;
+  background: #fff; color: #34402c; font-size: 14px;
+}
+.mg-modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 17px; }
+
+.mg-summary-list { list-style: none; padding: 0; margin: 0 0 13px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.mg-coach-tip { font-family: Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.65; color: #536445; }
+
+.mg-upgrade-list { list-style: none; padding: 0; margin: 0 0 13px; display: flex; flex-direction: column; gap: 9px; }
+.mg-upgrade-list li { display: flex; justify-content: space-between; align-items: center; gap: 13px; font-size: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-root, .mg-root * { transition: none !important; animation: none !important; }
+}

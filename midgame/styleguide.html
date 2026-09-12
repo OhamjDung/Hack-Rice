@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>RoomEconomy Style Guide</title>
+<style>
+  :root{
+    --bg:#f7f8f4; --card:#fff; --ink:#303a32; --muted:#65705b; --line:#e6e9e1;
+    --green:#647950; --soft:#eef1e8; --radius:12px; --danger:#a44737;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;}
+  h1{font-family:Georgia,'Times New Roman',serif;font-size:32px;letter-spacing:-1px;font-weight:400;margin:0;}
+  h2{font-size:20px;font-weight:600;letter-spacing:-.3px;margin:0;}
+  h3{font-size:15px;margin:0;}
+  p{line-height:1.65;margin:0;}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 32px 80px;}
+  .intro{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:36px;}
+  .intro p{color:var(--muted);font-size:13px;margin-top:10px;max-width:640px;}
+  .eyebrow{font-size:11px;letter-spacing:1.65px;font-weight:600;color:#65705b;text-transform:uppercase;display:block;margin-bottom:8px;}
+  section{margin-bottom:56px;}
+  section > h2{margin-bottom:6px;}
+  section > .desc{color:var(--muted);font-size:12px;margin-bottom:20px;max-width:680px;}
+
+  /* swatches */
+  .swatch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+  .swatch{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);}
+  .swatch .chip{height:56px;}
+  .swatch .label{padding:8px 10px;font-size:11px;}
+  .swatch .label b{display:block;font-family:Consolas,monospace;font-size:11px;color:var(--ink);}
+  .swatch .label span{display:block;color:var(--muted);margin-top:3px;font-size:10px;}
+  .dark-panel{background:#27322d;padding:24px;border-radius:12px;}
+  .dark-panel .swatch{background:#344238;border-color:#68785f;}
+  .dark-panel .swatch .label b{color:#f5f1e7;}
+  .dark-panel .swatch .label span{color:#c5d0bf;}
+
+  /* type specimen */
+  .type-row{display:flex;align-items:baseline;gap:18px;padding:14px 0;border-bottom:1px solid var(--line);}
+  .type-row:last-child{border-bottom:0;}
+  .type-row .tag{width:150px;flex-shrink:0;font-size:11px;color:var(--muted);font-family:Consolas,monospace;}
+  .serif-tag{color:#a97c3f;}
+
+  /* buttons */
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:39px;padding:10px 15px;border-radius:7px;font-size:11px;font-weight:600;white-space:nowrap;border:0;cursor:pointer;font-family:inherit;}
+  .primary{background:#667b52;border:1px solid #667b52;color:#fff;}
+  .primary:hover{background:#526741;}
+  .secondary{background:#fff;border:1px solid #dfe4d8;color:#5e6d51;}
+  .secondary:hover{background:#f0f3eb;}
+  .text-button{background:transparent;color:#6c7f57;font-size:11px;padding:4px 0;border:0;cursor:pointer;}
+  .text-button:hover{color:#334a24;text-decoration:underline;}
+  .icon-button{display:inline-grid;place-items:center;background:transparent;width:32px;height:32px;border-radius:6px;color:#65705b;border:0;cursor:pointer;font-size:16px;}
+  .icon-button:hover{background:#eef1e8;}
+  .button:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* form */
+  .form-demo{max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;}
+  label{font-size:11px;font-weight:500;color:#68745b;display:block;margin-bottom:14px;}
+  input:not([type=color]){display:block;width:100%;padding:10px 12px;border:1px solid #d9dfcf;border-radius:7px;background:#fff;color:#34402c;font-size:14px;margin-top:7px;}
+  input[type=color]{height:38px;padding:4px;cursor:pointer;margin-top:7px;width:100%;}
+
+  /* cards / stats / jars */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;}
+  .stat-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:9px;background:#eff2e9;color:#8a986c;margin-bottom:12px;}
+  .stat-label{font-size:11px;color:#65705b;display:block;margin:0 0 8px;}
+  .stat-value{font-size:24px;line-height:1;font-weight:500;letter-spacing:-.7px;font-variant-numeric:tabular-nums;}
+  .mini-track{height:4px;border-radius:8px;background:#eef0e8;overflow:hidden;margin-top:11px;}
+  .mini-track i{display:block;height:100%;border-radius:8px;background:#8a986c;}
+  .jar-row{padding:14px 0;border-bottom:1px solid var(--line);}
+  .jar-row:last-child{border-bottom:0;}
+  .jar-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px;}
+  .jar-label strong{font-weight:500;}
+  .jar-track{height:5px;border-radius:5px;background:#edf0e6;overflow:hidden;}
+  .jar-track i{display:block;height:100%;border-radius:5px;background:#647950;}
+  .jar-detail{display:block;font-size:11px;color:#65705b;margin-top:6px;}
+
+  /* messages */
+  .msg{padding:12px 16px;border-radius:8px;font-size:12px;margin-bottom:10px;}
+  .msg.error{background:#fff0e9;color:#9a4433;}
+  .msg.success{background:#eaf0df;color:#576a43;}
+  .msg.notice{background:#edf2e6;color:#667b53;}
+  .msg.warn{background:#fbefcf;color:#7a5b1e;border:1px solid #d9b779;}
+
+  /* modal mock */
+  .modal-mock{max-width:420px;border:1px solid #e2e7d8;border-radius:16px;padding:26px;background:#fcfcf8;box-shadow:0 24px 60px #28332222;}
+  .modal-mock h2{font-family:Georgia,serif;font-size:23px;font-weight:400;margin-bottom:12px;}
+  .modal-mock p{color:var(--muted);font-size:13px;margin-bottom:16px;}
+
+  /* dark world HUD mock */
+  .world-mock{background:#27322d;border-radius:14px;padding:28px;color:#f5f1e7;position:relative;min-height:260px;}
+  .world-mock .chapter{font-size:10px;letter-spacing:2px;color:#c2d1b6;margin-bottom:8px;}
+  .world-mock h3{font-family:Georgia,serif;font-size:22px;font-weight:400;margin-bottom:24px;}
+  .vitals{display:flex;gap:14px;margin-bottom:22px;}
+  .vital{display:flex;align-items:center;gap:8px;background:#344238;border:1px solid #62715a;border-radius:10px;padding:10px 14px;font-size:11px;}
+  .vital > div{width:50px;height:6px;background:#1f2a24;border-radius:5px;overflow:hidden;}
+  .vital i{display:block;height:100%;}
+  .vital.health i{background:#cc9a80;width:70%;}
+  .vital.mood i{background:#d6bc77;width:55%;}
+  .vital.energy i{background:#acc695;width:85%;}
+  .thought{background:#344238;border:1px solid #6b785e;border-radius:10px;padding:14px 18px;max-width:360px;font-size:13px;line-height:1.5;}
+  .thought.warning{border:2px solid #e4ab56;background:#604320;color:#fff0ce;}
+  .cta-row{display:flex;gap:10px;margin-top:20px;}
+  .world-btn{border:1px solid #66735e;background:#344238;color:#edf2e7;border-radius:9px;padding:10px 16px;font-size:11px;}
+  .end-day{background:#d4dcb6;color:#283622;border:1px solid #e2e7cf;border-radius:9px;padding:12px 18px;font-size:13px;font-weight:600;}
+  .coin-chip{display:inline-flex;align-items:center;gap:6px;color:#f1dfa8;background:#344238;border:1px solid #68785f;border-radius:8px;padding:8px 12px;font-size:12px;font-variant-numeric:tabular-nums;}
+
+  .hex-note{font-size:11px;color:var(--muted);margin-top:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    <span class="eyebrow">RoomEconomy</span>
+    <h1>Styling Guide</h1>
+    <p>Live reference pulled from <code>src/app/globals.css</code> and <code>src/app/game.css</code> — the two real stylesheets driving the actual game. See <code>STYLEGUIDE.md</code> in this folder for the full written spec, token list, and usage rules this page renders.</p>
+  </div>
+
+  <section>
+    <h2>Light surface — colors</h2>
+    <div class="desc">Cards, modals, forms, dashboard chrome. Base tokens from <code>:root</code>.</div>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="chip" style="background:#f7f8f4"></div><div class="label"><b>#f7f8f4</b><span>--bg</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#fff;border-bottom:1px solid #eee"></div><div class="label"><b>#ffffff</b><span>--card</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#303a32"></div><div class="label"><b>#303a32</b><span>--ink</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#65705b"></div><div class="label"><b>#65705b</b><span>--muted</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#e6e9e1"></div><div class="label"><b>#e6e9e1</b><span>--line</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#647950"></div><div class="label"><b>#647950</b><span>--green</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#eef1e8"></div><div class="label"><b>#eef1e8</b><span>--soft</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#a44737"></div><div class="label"><b>#a44737</b><span>--danger</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#eaf0df"></div><div class="label"><b>#eaf0df</b><span>success bg</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#fff0e9"></div><div class="label"><b>#fff0e9</b><span>error bg</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>World (dark) surface — colors</h2>
+    <div class="desc">The full-viewport in-game HUD. Not tokenized in source — literal hex reused throughout <code>game.css</code>.</div>
+    <div class="dark-panel">
+      <div class="swatch-grid">
+        <div class="swatch"><div class="chip" style="background:#27322d"></div><div class="label"><b>#27322d</b><span>world bg</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#344238"></div><div class="label"><b>#344238</b><span>panel fill</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#41513c"></div><div class="label"><b>#41513c</b><span>row fill</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#f5f1e7"></div><div class="label"><b>#f5f1e7</b><span>text (cream)</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#e7dca0"></div><div class="label"><b>#e7dca0</b><span>gold accent</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#d4dcb6"></div><div class="label"><b>#d4dcb6</b><span>CTA fill</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#cc9a80"></div><div class="label"><b>#cc9a80</b><span>health vital</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#d6bc77"></div><div class="label"><b>#d6bc77</b><span>mood vital</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#acc695"></div><div class="label"><b>#acc695</b><span>energy vital</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#e4ab56"></div><div class="label"><b>#e4ab56</b><span>warning border</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#ead69c"></div><div class="label"><b>#ead69c</b><span>coin chip</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#202731"></div><div class="label"><b>#202731</b><span>blackout tint</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Typography</h2>
+    <div class="desc">Arial for UI/data, Georgia serif reserved for narrative/character moments.</div>
+    <div class="panel">
+      <div class="type-row"><span class="tag">h1 · 32/400</span><h1 style="font-size:32px;">A little room. A lot of possibility.</h1></div>
+      <div class="type-row"><span class="tag serif-tag">modal title · Georgia 25/400</span><span style="font-family:Georgia,serif;font-size:25px;">Plan your next month</span></div>
+      <div class="type-row"><span class="tag serif-tag">advisor voice · Georgia 16</span><span style="font-family:Georgia,serif;font-size:16px;line-height:1.65;color:#626e50;">A fresh apartment. A fresh start. Give every dollar a place to call home.</span></div>
+      <div class="type-row"><span class="tag">h2 · sans 20/600</span><h2>Your Portfolio</h2></div>
+      <div class="type-row"><span class="tag">eyebrow · 11/600/+1.65</span><span class="eyebrow" style="margin:0;">Account holdings</span></div>
+      <div class="type-row"><span class="tag">stat value · 24/500 tabular</span><span style="font-size:24px;font-weight:500;letter-spacing:-.7px;font-variant-numeric:tabular-nums;">$3,214.50</span></div>
+      <div class="type-row"><span class="tag">body / muted · 13</span><span style="color:var(--muted);font-size:13px;">Duplicate transactions are skipped automatically.</span></div>
+      <div class="type-row"><span class="tag">UI label · 11</span><span style="font-size:11px;color:#65705b;">CASH</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Buttons</h2>
+    <div class="row">
+      <button class="button primary">Move in <span>&#8594;</span></button>
+      <button class="button secondary">Cancel</button>
+      <button class="text-button">See full history</button>
+      <button class="icon-button">&#10005;</button>
+      <button class="button primary" disabled>Disabled</button>
+    </div>
+    <div class="hex-note">Base: min-height 39px · padding 10px 15px · radius 7px · font-size 11px / weight 600. Active state: translateY(1px). Disabled: opacity .5.</div>
+  </section>
+
+  <section>
+    <h2>Forms</h2>
+    <div class="form-demo">
+      <label>Your name<input placeholder="Alex Rivera"/></label>
+      <label>Monthly take-home pay ($)<input type="number" placeholder="3200"/></label>
+      <label>Shirt color<input type="color" value="#647950"/></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cards, stats &amp; progress</h2>
+    <div class="card-grid">
+      <div class="panel">
+        <div class="stat-icon">&#10084;</div>
+        <span class="stat-label">HEALTH</span>
+        <span class="stat-value">86</span>
+        <div class="mini-track"><i style="width:86%"></i></div>
+      </div>
+      <div class="panel">
+        <div class="jar-row" style="border:0;padding:0;">
+          <div class="jar-label"><strong>Food</strong><span>$180 / $240</span></div>
+          <div class="jar-track"><i style="width:75%"></i></div>
+          <span class="jar-detail">$60 remaining this month</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Status messages</h2>
+    <div class="msg error">Your saved game could not be read. Start a new run or import a valid save.</div>
+    <div class="msg success">Budget updated. Existing spending and rollover are preserved.</div>
+    <div class="msg notice">Nessie is read-only. Purchases and transfers are deduplicated.</div>
+    <div class="msg warn">Food spending is over budget by $18.40. Your next choice matters.</div>
+  </section>
+
+  <section>
+    <h2>Modal</h2>
+    <div class="modal-mock">
+      <h2>A little room. A lot of possibility.</h2>
+      <p>Meet your character, give every dollar a job, and make yourself at home.</p>
+      <button class="button primary">Move in &#8594;</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>World HUD (dark surface, in-game)</h2>
+    <div class="world-mock">
+      <div class="chapter">CHAPTER 02</div>
+      <h3>A place to call your own</h3>
+      <div class="vitals">
+        <div class="vital health">&#10084; <div><i></i></div></div>
+        <div class="vital mood">&#9786; <div><i></i></div></div>
+        <div class="vital energy">&#9889; <div><i></i></div></div>
+        <div class="coin-chip">&#9679; 240 coins</div>
+      </div>
+      <div class="thought">"A new day. A small chance to make life better."</div>
+      <div class="thought warning" style="margin-top:10px;">"OMG, yesterday I fed my shopping addiction. Now my fridge is applying for food stamps."</div>
+      <div class="cta-row">
+        <button class="world-btn">History</button>
+        <button class="world-btn">Journal</button>
+        <button class="end-day">End day &#8594;</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
