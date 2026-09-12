@@ -1,9 +1,9 @@
 /* Trading sandbox (investing.html): one timed session with fixed starting
    cash, scored against a persisted personal record. The market model lives
    in market.js and the UI in trading.js; this file only owns the session
-   summary and record. */
+   summary and record. Session length comes from the real data itself (see
+   sessionDurationMs in market.js) rather than a fixed timer. */
 (function () {
-  const SESSION_DURATION_MINUTES = 12;
   const STARTING_CASH = 10000;
 
   const el = id => document.getElementById(id);
@@ -16,7 +16,6 @@
   const floor = createTradingFloor(el('floor'), {
     market,
     account,
-    durationMs: SESSION_DURATION_MINUTES * 60 * 1000,
     backLink: { href: 'career.html', label: '← Nest Egg' },
     onEnd: showSummary,
   });
@@ -54,5 +53,5 @@
   floor.start();
 
   // debug hook for manual testing in the console
-  window.__game = { market, account, handleEvent: floor.fireEvent, endSession: floor.end, EVENTS, COMPANIES };
+  window.__game = { market, account, endSession: floor.end };
 })();

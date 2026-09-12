@@ -23,16 +23,17 @@ function renderChart(svg, history, trades) {
   (trades || []).forEach(tr => {
     const p = pts[history.findIndex(h => h.seq === tr.seq)];
     if (!p) return;
-    const color = tr.type === 'buy' ? '#3ddc5a' : '#e5473f';
+    const color = tr.type === 'buy' ? 'var(--green)' : 'var(--red)';
     const glyph = tr.type === 'buy'
       ? `M${(p.x - 6).toFixed(1)},${(p.y + 11).toFixed(1)} L${(p.x + 6).toFixed(1)},${(p.y + 11).toFixed(1)} L${p.x.toFixed(1)},${(p.y - 1).toFixed(1)} Z`
       : `M${(p.x - 6).toFixed(1)},${(p.y - 11).toFixed(1)} L${(p.x + 6).toFixed(1)},${(p.y - 11).toFixed(1)} L${p.x.toFixed(1)},${(p.y + 1).toFixed(1)} Z`;
-    markers += `<path d="${glyph}" fill="${color}" stroke="#0a0a0b" stroke-width="1"/>`;
+    markers += `<path d="${glyph}" fill="${color}" stroke="var(--bg)" stroke-width="1"/>`;
   });
 
+  // Colors are CSS custom properties so the chart follows whichever theme is loaded.
   svg.innerHTML = `
-    <line x1="0" y1="${last.y.toFixed(1)}" x2="${CHART_W}" y2="${last.y.toFixed(1)}" stroke="#3a3a3e" stroke-width="1"/>
-    <path d="${d}" fill="none" stroke="${up ? '#3ddc5a' : '#f5e642'}" stroke-width="2.5"/>
+    <line x1="0" y1="${last.y.toFixed(1)}" x2="${CHART_W}" y2="${last.y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+    <path d="${d}" fill="none" stroke="${up ? 'var(--green)' : 'var(--red)'}" stroke-width="2.5"/>
     ${markers}
   `;
   return last;
