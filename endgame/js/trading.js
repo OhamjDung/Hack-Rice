@@ -57,7 +57,7 @@ function createTradingFloor(root, options) {
         </div>
         <div class="history-feed">
           <h2>Trade History</h2>
-          <div data-ref="historyList"><div class="history-empty">Trades you make this session show up here.</div></div>
+          <div class="history-list" data-ref="historyList"><div class="history-empty">Trades you make this session show up here.</div></div>
         </div>
       </div>
       <div class="locked-banner" data-ref="lockedBanner" style="display:none;">Session ended. Trading is locked.</div>

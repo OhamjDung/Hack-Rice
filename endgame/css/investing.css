@@ -59,6 +59,7 @@ button{font-family:inherit;}
 
 /* ---------- trade history: always visible, not capped like a per-stock log ---------- */
 .history-feed h2{font-size:15px;color:var(--text);margin:0 0 12px;}
+.history-list{max-height:220px;overflow-y:auto;padding-right:4px;}
 .history-card{
   display:flex;gap:10px;align-items:baseline;background:var(--panel);border:1px solid var(--border);
   border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:13px;
