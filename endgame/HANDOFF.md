@@ -1,104 +1,123 @@
-# Handoff: RoomEconomy Investing Mini-Game (`endgame/`)
+# Handoff: Nest Egg + Grapefruit Trading (`endgame/`)
 
-Standalone mockup, isolated in `endgame/`. Plain HTML/CSS/JS — **no
+Standalone game, isolated in `endgame/`. Plain HTML/CSS/JS — **no
 build step, no framework, no bundler.** All scripts are non-module
 `<script src>` tags sharing global scope (deliberate: keeps file://
 double-click working, no CORS issues). Don't introduce ES modules,
-npm, or a bundler here unless asked.
+npm, or a bundler here unless asked. Not wired into the Next.js app
+in `src/` — don't do that unless the user asks.
 
 ## Run it
+
+Double-click `career.html` (or `investing.html`), or:
 
 ```
 cd endgame
 python -m http.server 8000
 ```
-Visit `http://localhost:8000/investing.html`. (Double-clicking the
-file directly also works since there's no module/fetch dependency.)
+Then open `http://localhost:8000/career.html`.
 
-`index.html` is a separate, earlier dashboard mockup (static, no
-game logic) — not part of the investing feature. Ignore unless asked
-to touch it.
+Engine tests (Node 22, no install): `node --test endgame/tests/nestegg.test.mjs`
 
-## What exists
+## The two pages
 
-**Feature**: news-driven sector event system for an investing
-mini-game. 5 sectors × 4 fictional companies each + 6 ETFs (5 sector
-composites + 1 broad market index). Random breaking-news events move
-sector stock prices. 12-minute session timer locks trading at zero
-and shows a results/reward screen scored against a persisted
-personal record.
+**`career.html` — Nest Egg (the main game).** One round = one year of a
+career, starting at 22:
 
-### Files
+1. **Paycheck** — pick a job at the start; salary minus simplified 2026
+   federal brackets, flat 4% state tax, and FICA = take-home. A random
+   life event may hit (car repair, bonus, promotion…).
+2. **Expenses** — player writes monthly expenses (essentials have
+   inflation-adjusted minimums; custom lines can be added/removed).
+   A shortfall comes out of savings → brokerage cash → credit card (22% APR).
+3. **Invest** — leftover + existing savings can go into 401(k) (pre-tax,
+   50% employer match up to 6% of salary), Traditional IRA (pre-tax),
+   Roth IRA (after-tax), or a brokerage account. Pre-tax contributions
+   show the income tax they remove, so they cost less than they add.
+   2026 limits ($24,500 / $7,500 shared IRA, catch-up at 50) inflate yearly.
+   Uninvested money pays debt first, then stays in savings (3.5% APY).
+4. **Trade (optional)** — a 90-second session on the Grapefruit Trading
+   floor using the brokerage account. Holdings persist across years.
+5. **Year end** — the rest of the year's market move is applied; 401(k)
+   and IRAs grow with the GRPX market index; interest; raise; age + 1.
+   Includes a one-line lesson, and **Fast-forward 5 years** (reuses the
+   last budget + plan, no trading).
+
+**Retire** is allowed at the start of a year or at year end (forced at 70).
+Payout: savings as-is; brokerage pays 15% on gains; 401(k)/Traditional
+IRA taxed at a flat 15%; Roth tax-free. Before 60 (59½ rounded) retirement
+accounts take a 10% penalty (Roth: on earnings only). The **leaderboard**
+(top 10, localStorage) ranks the after-tax total kept.
+
+**`investing.html` — trading sandbox.** The original mini-game: one
+12-minute session, $10k starting cash, reward vs. personal record.
+
+`index.html` is an earlier static dashboard mockup, unrelated.
+
+## Files
 
 | File | Purpose |
 |---|---|
-| `investing.html` | Page shell — sidebar (stock/ETF picker) + browse view (portfolio, news feed) + fullscreen trade overlay + summary modal |
-| `css/investing.css` | All styling. Dark theme, tokens at top of file |
-| `data/companies.js` | `COMPANIES` (20), `SECTORS` (5), `ETFS` (6) — plain data, edit freely |
-| `data/events.js` | `EVENTS` — 150 headlines, 30/sector, tiered minor/moderate/major/crisis with `priceChangeRange` + `weight`. Plain data, edit freely |
-| `js/scheduler.js` | `EventScheduler` class — weighted no-repeat draw, fires on random 8–20s interval |
-| `js/rewards.js` | `loadRecord`/`saveRecord` (localStorage `endgame-investing-record-v1`), `calcReward()` — diminishing-returns formula vs personal best |
-| `js/chart.js` | `renderChart(svg, history, trades)` — SVG line + buy/sell triangle markers |
-| `js/app.js` | Everything else: state, rendering, event application, buy/sell, session timer, summary. Single IIFE, all consts at top |
+| `data/companies.js` | `COMPANIES` (20), `SECTORS` (5), `ETFS` (6). Plain data |
+| `data/events.js` | `EVENTS` — 150 headlines with `priceChangeRange` + `weight`. Plain data |
+| `data/life.js` | Nest Egg data: `CAREER` tuning, `JOBS`, `TAX`, `ACCOUNT_RULES`, `DEFAULT_EXPENSES`, `LIFE_EVENTS`. Plain data — balance here |
+| `js/finance.js` | Pure money math: `taxesFor`, `contributionLimits`, `employerMatch`, `planAllocation`, `maxAllocation`, `retirementPayout` |
+| `js/market.js` | Pure market model shared by both pages: `createMarket`, `applyMarketEvent`, `stepMarket`, `applyYearlyMarketMove`, `holdingsValue` |
+| `js/career-engine.js` | Pure yearly loop: `newCareer`, `beginYear`, `payExpenses`, `investLeftover`, `finishYear`, `autoYear`, `retireCareer`, `addToLeaderboard`. Mutates a plain `career` object |
+| `js/trading.js` | `createTradingFloor(root, opts)` — reusable trading UI (topbar, sidebar, portfolio, news, fullscreen chart + buy/sell) |
+| `js/scheduler.js` | `EventScheduler` — weighted no-repeat news draw on a random interval |
+| `js/chart.js` | `renderChart(svg, history, trades)` — SVG line + buy/sell markers (matched by history `seq`) |
+| `js/career.js` | Nest Egg screens. Owns `career`/`market`, saves to localStorage, delegated `data-action` buttons |
+| `js/app.js` | Sandbox page: session summary + personal record around a trading floor |
+| `js/rewards.js` | Sandbox record (`endgame-investing-record-v1`) + `calcReward()` |
+| `css/investing.css` | Tokens + trading floor styles (both pages) |
+| `css/career.css` | Nest Egg screens |
+| `tests/nestegg.test.mjs` | Loads the pure scripts into a `vm` context and tests taxes, limits, payout, news reaction, full years, fast-forward, leaderboard |
 
-Load order in `investing.html`: `companies.js` → `events.js` →
-`rewards.js` → `chart.js` → `scheduler.js` → `app.js`. Keep that
-order if adding scripts (data before logic, `app.js` last).
+Script order: data → `chart`/`scheduler` → `market` → `finance` →
+`trading` → `career-engine` → page script last (see each HTML file).
 
-### How it works (read `js/app.js` top-to-bottom, it's one file)
+## How the market works
 
-- `state` object holds live clones of companies/ETFs (each with
-  `price`, `history[]`, `trades[]`), `cash`, `holdings`, session
-  status. Nothing is React — direct DOM writes via `innerHTML` and
-  small render functions (`renderSidebar`, `renderPortfolio`,
-  `renderDetail`, etc.), called after every mutation.
-- `EventScheduler` (from `scheduler.js`) fires a random `EVENTS`
-  entry every 8–20s → `handleEvent()` → `applyEventToSector()` moves
-  every company in that sector by `priceChangeRange` scaled by each
-  company's `volatility`, then recomputes that sector's ETF and the
-  market ETF.
-- A separate `idleTick()` (every 2.5s) adds a **tiny** (±0.3%)
-  cosmetic jitter to all companies so charts don't sit dead flat
-  between events — clearly commented in code as cosmetic-only, not a
-  competing mechanic.
-- Clicking a sidebar row opens `.detail-overlay` (real fullscreen via
-  CSS `position:fixed;inset:0`, not the Fullscreen API) with a big
-  chart + buy/sell panel. Buy/sell push into that instrument's
-  `trades[]`; `chart.js` draws a green/red triangle at the trade's
-  history index.
-- Session: `SESSION_DURATION_MINUTES` const (currently 12) → 
-  countdown via `requestAnimationFrame`. At zero: `endSession()`
-  stops the scheduler/idle timer, locks buy/sell buttons, shows
-  `showSummary()` — computes gain vs `STARTING_CASH`, calls
-  `calcReward()`, persists new record if beaten.
-- `window.__game` exposes `{state, handleEvent, endSession, EVENTS,
-  COMPANIES}` in the console — useful for manually firing an event or
-  ending the session without waiting, for testing.
+- Each company has an **anchor** (real price) plus a small cosmetic
+  `drift` wiggle that decays each 1.5s step, so it can't accumulate.
+- A news event moves the sector's anchors **35% immediately and the rest
+  over 15 seconds** (`REACTION_*` in `market.js`), so reading headlines
+  fast is a real edge. Session end lands any pending reaction.
+- Between sessions (career mode), `applyYearlyMarketMove` applies a
+  market return (~7% mean, 16% stdev) + sector shock + company noise.
+- History points carry a shared `seq`; trades store `seq`, so chart
+  markers survive history trimming (800 points).
+- The sidebar is built once and updated in place (no mid-click rebuilds).
 
-### Verified working (headless Chromium smoke test, no console errors)
+## Storage keys
 
-Open → view chart → buy → sell (markers appear on chart) → manually
-fire event (sector price + ETF + market ETF move, ticker banner +
-news feed update) → exit fullscreen → open an ETF → force session
-end → summary modal with reward + new-record badge.
+- `endgame-nestegg-save-v1` — career in progress (cleared on retire)
+- `endgame-nestegg-leaderboard-v1` — top 10 retirements
+- `endgame-investing-record-v1` — sandbox personal record
 
-## Known gaps / things a fresh AI should know before changing this
+## Debug hooks
 
-- **No idle price movement is "real"** — only news events and the
-  cosmetic jitter move prices. If asked for more organic-feeling
-  price action, that's an intentional gap, not a bug.
-- **Reward formula constants are untuned guesses** (`baseReward:100,
-  scalingFactor:1.6, cap:3, floor:0.2, recordBonus:0.5` in
-  `rewards.js`). Balance later against actual playtesting.
-- **No sound/animation polish** beyond the CSS transitions already
-  there (price flash, ticker banner background flash).
-- **No integration with the main Next.js app** (`src/` at repo
-  root) — this is a standalone mockup per explicit instruction
-  ("work in endgame folder only"). Don't wire it into `src/` unless
-  the user asks.
-- **`index.html` vs `investing.html`** are unrelated pages sharing
-  only the dark-theme visual language; no shared state or nav logic
-  besides a plain `<a href>` back-link.
-- Company/event data is meant to be **hand-edited directly** in the
-  `data/*.js` files — there's no generator script, no build step to
-  rerun after editing.
+- Career: `window.__nestEgg` → `{ career, market, floor, save, render }`
+  e.g. `__nestEgg.floor.fireEvent(EVENTS[0])`, `__nestEgg.floor.end()`
+- Sandbox: `window.__game` → `{ market, account, handleEvent, endSession, EVENTS, COMPANIES }`
+
+## Verified
+
+- `node --test endgame/tests/nestegg.test.mjs` — 11/11.
+- Headless Chrome run (42 checks, no console errors): start → paycheck →
+  expense minimum rejected → custom expense → invest (full match, Roth
+  max, over-budget blocked) → trading floor (news, buy, reaction keeps
+  moving price, marker, end early) → review → reload + continue →
+  fast-forward → retire locked mid-year → retire with early penalty →
+  leaderboard persists; sandbox session + Results button; no horizontal
+  overflow at 400px.
+
+## Known gaps / next ideas
+
+- Tax model is intentionally simplified (single filer, no Roth income
+  phase-out, flat retirement tax, no RMDs, no Social Security benefits).
+- Balance numbers in `data/life.js` are first guesses — playtest.
+- Retirement accounts only track the market index (no fund choice).
+- No sell-down of brokerage holdings to cover a shortfall (goes to debt).
+- Leaderboard is per-browser; a shared one needs a backend.

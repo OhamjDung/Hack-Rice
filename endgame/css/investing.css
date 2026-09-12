@@ -24,7 +24,16 @@ button{font-family:inherit;}
 .topbar .metric.cash .val{color:var(--green);}
 .topbar .metric.timer .val{font-variant-numeric:tabular-nums;color:var(--yellow);}
 .topbar .metric.timer.warn .val{color:var(--red);animation:pulse 1s infinite;}
+.topbar .results-btn{background:linear-gradient(#ffe94d,#f4d70e);color:#1c1c00;border:none;border-radius:6px;
+  padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;}
+.topbar .results-btn[hidden]{display:none;}
+.topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.topbar .topbar-btn{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;
+  padding:7px 12px;font-size:13px;cursor:pointer;}
+.topbar .topbar-btn:hover{border-color:#555;}
+.topbar-actions [hidden]{display:none;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+@media (max-width:640px){ .topbar{flex-wrap:wrap;gap:10px 16px;padding:10px 16px;} .topbar .spacer{display:none;} .browse{padding:16px;} }
 
 /* ---------- layout ---------- */
 .layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 58px);}
@@ -85,6 +94,9 @@ button{font-family:inherit;}
 .holdings-table th{text-align:left;color:var(--muted);font-weight:600;padding:6px 4px;border-bottom:1px solid var(--border);}
 .holdings-table td{padding:6px 4px;border-bottom:1px solid #202023;}
 .holdings-empty{color:var(--muted);font-size:12px;padding:8px 2px;}
+.table-scroll{overflow-x:auto;}
+.how-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:12px;color:#b8b8bc;line-height:1.5;}
+.how-card b{color:var(--yellow);}
 
 .news-feed h2{font-size:15px;color:#d3d3d6;margin:0 0 12px;}
 .news-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:10px;}
@@ -123,6 +135,11 @@ button{font-family:inherit;}
   min-width:0;
 }
 .chart-wrap svg{width:100%;height:100%;display:block;}
+@media (max-width:760px){
+  .detail-top{flex-wrap:wrap;padding:12px 16px;}
+  .detail-body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(220px,42vh) auto;overflow-y:auto;}
+  .trade-panel{border-left:none;border-top:1px solid var(--border);}
+}
 
 .trade-panel{border-left:1px solid var(--border);background:var(--panel);padding:18px;overflow-y:auto;}
 .trade-panel h3{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}

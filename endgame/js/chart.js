@@ -18,8 +18,10 @@ function renderChart(svg, history, trades) {
   const up = last.price >= first.price;
 
   let markers = '';
+  // Trades point at a history `seq` (not an array index) so markers stay put
+  // when old points are trimmed; a trade whose point was trimmed is skipped.
   (trades || []).forEach(tr => {
-    const p = pts[tr.index];
+    const p = pts[history.findIndex(h => h.seq === tr.seq)];
     if (!p) return;
     const color = tr.type === 'buy' ? '#3ddc5a' : '#e5473f';
     const glyph = tr.type === 'buy'

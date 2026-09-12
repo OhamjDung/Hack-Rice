@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Nest Egg — Earn, Budget, Invest, Retire</title>
+<link rel="stylesheet" href="css/investing.css"/>
+<link rel="stylesheet" href="css/career.css"/>
+</head>
+<body>
+
+<header class="ne-header" id="neHeader" hidden></header>
+<main id="screen"><noscript><p style="padding:24px">Nest Egg needs JavaScript turned on.</p></noscript></main>
+
+<!-- fullscreen trading floor for the brokerage account -->
+<div class="trading-host" id="tradingHost" hidden></div>
+
+<!-- retire confirmation -->
+<div class="modal-backdrop" id="confirmModal" role="dialog" aria-modal="true">
+  <div class="summary-card" id="confirmCard"></div>
+</div>
+
+<script src="data/companies.js"></script>
+<script src="data/events.js"></script>
+<script src="data/life.js"></script>
+<script src="js/chart.js"></script>
+<script src="js/scheduler.js"></script>
+<script src="js/market.js"></script>
+<script src="js/finance.js"></script>
+<script src="js/trading.js"></script>
+<script src="js/career-engine.js"></script>
+<script src="js/career.js"></script>
+</body>
+</html>

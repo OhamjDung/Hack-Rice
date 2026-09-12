@@ -24,7 +24,7 @@ function saveRecord(record) {
  * reward = baseReward * clamp(floor, cap, log(1 + improvementRatio) * scalingFactor)
  * improvementRatio = max(0, currentGain) / priorBest (or a safe default on the first run).
  * A below-record run still nets a small non-zero reward (the floor) so
- * experimentation isn't punished. A new record adds a flat bonus.
+ * experimentation isn't punished. A new (profitable) record adds a flat bonus.
  */
 function calcReward(currentGain, record, opts = {}) {
   const baseReward = opts.baseReward ?? 100;
@@ -41,7 +41,8 @@ function calcReward(currentGain, record, opts = {}) {
   let multiplier = Math.log(1 + improvementRatio) * scalingFactor;
   multiplier = Math.max(floor, Math.min(cap, multiplier));
 
-  const isNewRecord = isFirstRun || currentGain > priorBest;
+  // A record needs a real profit — a losing first run doesn't earn the badge/bonus.
+  const isNewRecord = currentGain > 0 && (isFirstRun || currentGain > priorBest);
   let reward = Math.round(baseReward * multiplier);
   if (isNewRecord) reward += Math.round(baseReward * recordBonus);
 
