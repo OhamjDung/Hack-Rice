@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xpenses — an investing simulator</title>
+<style>
+:root{
+  --ink:#000; --board:#174D05; --board-dk:#0C2A03; --board-lt:#1E6407;
+  --chalk:#fff; --chalk-dim:#A9C49A; --money:#22FF00;
+  --peach:#E5AA7A; --rust:#C94C1A; --cyan:#00B7EF; --cream:#F5E49C; --red:#ED1C24;
+  --grey:#B4B4B4;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--board-dk);
+  background-image:radial-gradient(rgba(255,255,255,.045) 1px,transparent 1px);
+  background-size:3px 3px;
+  color:var(--chalk); font-family:var(--sans); font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+img,canvas{image-rendering:pixelated; image-rendering:crisp-edges;}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--cyan); outline-offset:2px}
+
+/* ---------- structural ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:14px}
+.topbar{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:var(--board);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);
+  padding:10px 12px;margin-bottom:14px;
+}
+.brand{font-weight:800;letter-spacing:-.5px;font-size:19px;color:var(--cream);margin-right:4px}
+.brand span{color:var(--money)}
+.stat{font-family:var(--mono);font-size:13px;color:var(--chalk-dim);white-space:nowrap}
+.stat b{color:var(--chalk);font-weight:700}
+.stat .m{color:var(--money)}
+.grow{flex:1 1 auto}
+.cols{display:grid;grid-template-columns:250px minmax(0,1fr) 250px;gap:14px;align-items:start}
+@media(max-width:940px){.cols{grid-template-columns:1fr}.rail-r{order:3}}
+
+.slab{background:var(--board);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:12px}
+.slab h2{margin:0 0 8px;font-size:15px;font-weight:800;color:var(--cream);letter-spacing:-.2px}
+.hr{height:2px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.5) 0 4px,transparent 4px 7px);margin:9px 0}
+
+/* ---------- room ---------- */
+.stage{background:var(--board);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:12px}
+#room{display:block;width:100%;height:auto;background:#000;border:3px solid var(--ink);cursor:pointer;touch-action:manipulation}
+.roomfoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.hint{font-size:12px;color:var(--chalk-dim);font-family:var(--mono)}
+
+/* ---------- buttons ---------- */
+.btn{
+  background:var(--peach);color:#000;border:3px solid var(--ink);box-shadow:3px 3px 0 var(--ink);
+  padding:7px 13px;font-weight:800;letter-spacing:-.2px;
+}
+.btn:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--ink)}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.btn.go{background:var(--money)}
+.btn.ghost{background:var(--board-lt);color:var(--chalk)}
+.btn.warn{background:var(--rust);color:#fff}
+.btn.sm{padding:3px 8px;font-size:12px;box-shadow:2px 2px 0 var(--ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none;box-shadow:3px 3px 0 var(--ink)}
+
+/* ---------- jars ---------- */
+.jar{margin-bottom:9px}
+.jarrow{display:flex;justify-content:space-between;gap:6px;font-family:var(--mono);font-size:12.5px;align-items:baseline}
+.jarrow .n{color:var(--chalk);font-family:var(--sans);font-weight:600;font-size:13.5px}
+.jarrow .v{color:var(--money);white-space:nowrap}
+.bar{height:9px;border:2px solid var(--ink);background:var(--board-dk);margin-top:3px;position:relative;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--cyan)}
+.bar i.over{background:var(--rust)}
+.bar i.save{background:var(--money)}
+
+/* ---------- log / ticker ---------- */
+.log{font-size:12.5px;max-height:330px;overflow:auto}
+.log p{margin:0 0 7px;padding-left:10px;border-left:3px solid var(--board-lt)}
+.log p.bad{border-color:var(--rust);color:#FFD9CB}
+.log p.good{border-color:var(--money)}
+.log p.big{border-color:var(--red);color:#FFC9C9;font-weight:700}
+.tick{background:var(--board-dk);border:2px solid var(--ink);padding:7px 9px;font-size:12px;font-family:var(--mono);color:var(--cream);margin-bottom:8px}
+.tick b{color:var(--red)}
+
+/* ---------- meters ---------- */
+.meter{display:flex;align-items:center;gap:7px;margin:5px 0;font-size:12.5px;font-family:var(--mono)}
+.meter .t{width:52px;color:var(--chalk-dim)}
+.meter .b{flex:1;height:11px;border:2px solid var(--ink);background:var(--board-dk)}
+.meter .b i{display:block;height:100%}
+
+/* ---------- modal ---------- */
+.veil{position:fixed;inset:0;background:rgba(6,20,2,.72);display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.veil[hidden]{display:none}
+.panel{
+  background:var(--board);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);
+  width:min(660px,100%);max-height:88vh;overflow:auto;padding:16px;
+}
+.panel h3{margin:0;font-size:21px;letter-spacing:-.4px;color:var(--cream)}
+.panel .sub{color:var(--chalk-dim);font-size:13px;margin:3px 0 0}
+.phead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.x{background:none;border:none;color:var(--chalk);font-size:22px;line-height:1;padding:2px 6px}
+
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+th{text-align:left;color:var(--chalk-dim);font-weight:600;padding:4px 6px;border-bottom:2px solid var(--board-lt)}
+td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.12)}
+td.r,th.r{text-align:right}
+.pos{color:var(--money)} .neg{color:#FF8A6B}
+
+input[type=text],input[type=number],select{
+  font-family:var(--mono);font-size:13px;background:var(--board-dk);color:var(--chalk);
+  border:2px solid var(--ink);padding:5px 7px;width:100%;
+}
+input[type=range]{width:100%;accent-color:#22FF00}
+label.f{display:block;font-size:12.5px;color:var(--chalk-dim);margin:9px 0 3px}
+
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:9px}
+.tier{background:var(--board-dk);border:3px solid var(--ink);padding:9px;text-align:left}
+.tier[aria-pressed=true]{background:var(--peach);color:#000}
+.tier[aria-pressed=true] small{color:#3a2413}
+.tier b{display:block;font-size:14px}
+.tier small{display:block;font-family:var(--mono);font-size:11.5px;color:var(--chalk-dim);margin-top:2px}
+
+.note{background:var(--board-dk);border-left:4px solid var(--cream);padding:8px 10px;font-size:12.5px;margin:10px 0}
+.money{font-family:var(--mono);color:var(--money)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.split{grid-template-columns:1fr}}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.chip{font-family:var(--mono);font-size:11.5px;background:var(--board-dk);border:2px solid var(--ink);padding:2px 6px}
+
+/* ---------- title / end ---------- */
+.title{max-width:720px;margin:6vh auto;padding:16px}
+.title h1{font-size:clamp(34px,7vw,58px);margin:0;letter-spacing:-2px;line-height:.95;color:var(--cream)}
+.title h1 em{font-style:normal;color:var(--money)}
+.title p{max-width:60ch}
+.modepick{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+@media(max-width:560px){.modepick{grid-template-columns:1fr}}
+.modecard{background:var(--board);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);padding:14px;text-align:left}
+.modecard b{font-size:17px;display:block;color:var(--cream)}
+.modecard span{font-size:13px;color:var(--chalk-dim)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="veil" id="veil" hidden><div class="panel" id="panel"></div></div>
+<script>
+"use strict";
+const ROOM_B64 = "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";
+
+/* =====================================================================
+   1. TUNING DATA  — build order step 1: everything keys off these numbers.
+      Edit this block to rebalance the economy without touching logic.
+   ===================================================================== */
+const TUNING = {
+  start_age: 22,
+  start_year: 2026,
+  start_cash: 2400,
+  death_age_range: [66, 82],
+  max_turns: 40,
+
+  jobs: {
+    office: { name:"Office 9–5", wage:3850, hours:40, health_mo:0, happy_mo:+0.2,
+      raise:0.028, match:0.04, note:"401k with a 4% employer match.", tier:"salary" },
+    night: { name:"Night shift", wage:4700, hours:45, health_mo:-0.55, happy_mo:-0.35,
+      raise:0.018, match:0.0, note:"Pays more. Your body pays for it.", tier:"hourly" },
+    rig:   { name:"Rotation work", wage:7200, hours:65, health_mo:-0.85, happy_mo:-0.95,
+      raise:0.035, match:0.02, note:"Housing is covered on rotation. Nothing else is.", tier:"rotation" }
+  },
+
+  housing: [
+    { id:"roommates", name:"Two roommates", rent:820,  happy:-0.25, health:0 },
+    { id:"studio",    name:"Studio",        rent:1350, happy:+0.15, health:0 },
+    { id:"onebed",    name:"One bedroom",   rent:1780, happy:+0.45, health:+0.1 }
+  ],
+
+  /* Each tier: cost is the monthly bill. min_viable is the floor below which
+     consequences start accruing. */
+  food:  [ {name:"Rice and beans", cost:210, health:-0.5, happy:-0.4},
+           {name:"Cook at home",   cost:390, health:+0.45, happy:0},
+           {name:"Whatever I want",cost:720, health:+0.25, happy:+0.5} ],
+  transport:[ {name:"Bus pass", cost:96,  happy:-0.2, reliability:0.93},
+              {name:"Old car",  cost:265, happy:+0.1, reliability:0.90},
+              {name:"New car",  cost:520, happy:+0.35, reliability:0.99} ],
+  amenities:[ {name:"Bare minimum", cost:145, happy:-0.3, health:-0.15},
+              {name:"Normal",       cost:255, happy:0,    health:0},
+              {name:"Comfortable",  cost:420, happy:+0.35, health:+0.1} ],
+  entertainment:[ {name:"Free stuff", cost:60,  happy:-0.45},
+                  {name:"Some nights out", cost:230, happy:+0.45},
+                  {name:"Good time",  cost:520, happy:+0.9} ],
+
+  min_viable_ratio: 0.75,     // fund a category below this share of its bill and it bites
+  /* Money you don't give a job to gets spent on nothing in particular. This is
+     what makes jars matter — you can't save by accident. */
+  unbudgeted_leak: 0.65,
+  cost_drift_yr: 0.021,       // prices climb every January. wages climb a little faster.
+  /* Nothing stays good on its own. Both stats drift down every month, so the
+     numbers still mean something at year 30 instead of sitting pinned at 100. */
+  health_decay: 0.18, mood_decay: 0.45,
+  savings_apy: 0.041,
+  health_start: 82,
+  happy_start: 70,
+
+  /* Event scheduler: no run-enders before this turn, and never back to back. */
+  first_run_ender_turn: 5,
+  run_ender_cooldown: 3,
+  tier_weights: { annoyance: 60, month_breaker: 30, run_ender: 10 }
+};
+
+/* Tax table lives in its own labelled block so it can be swapped each year
+   without digging through code. Deliberately simplified — single filer. */
+const TAX_DATA = {
+  tax_year: 2025,
+  source_note: "Single filer, simplified. Update this block, not the code.",
+  standard_deduction: 15000,
+  brackets: [
+    { up_to: 11925,  rate: 0.10 },
+    { up_to: 48475,  rate: 0.12 },
+    { up_to: 103350, rate: 0.22 },
+    { up_to: 197300, rate: 0.24 },
+    { up_to: Infinity, rate: 0.32 }
+  ],
+  fica: 0.0765,
+  withholding_rate: 0.19,      // deliberately a bit high → refunds feel earned
+  filing_month: 3,             // April (0-indexed)
+  filing_day: 15,
+  late_penalty: 0.0            // missing the deadline ends the run instead
+};
+
+/* =====================================================================
+   2. MARKET — 5 sectors x 3 companies, one index, one bond fund, savings.
+      Tuned so the index beats stock picking in expectation over ~30 turns
+      while picking keeps fat tails in both directions.
+   ===================================================================== */
+const SECTORS = [
+  { id:"tech",   name:"Technology", beta:1.35, vol:0.052 },
+  { id:"energy", name:"Energy",     beta:1.10, vol:0.060 },
+  { id:"health", name:"Healthcare", beta:0.85, vol:0.040 },
+  { id:"retail", name:"Retail",     beta:1.05, vol:0.048 },
+  { id:"indus",  name:"Industrials",beta:0.95, vol:0.038 }
+];
+const COMPANIES = [
+  ["NVX","Novix Compute","tech"],["HLM","Helm Software","tech"],["QRT","Quartile AI","tech"],
+  ["BSN","Basin Petroleum","energy"],["TDW","Tidewell Power","energy"],["CRX","Corrix Drilling","energy"],
+  ["MRD","Meridian Health","health"],["PLC","Pallas Care","health"],["VSA","Vesalia Labs","health"],
+  ["GDW","Goodward Stores","retail"],["LNP","Lanpost Grocers","retail"],["FRB","Fairbrook Retail","retail"],
+  ["ATL","Atlas Freight","indus"],["KVN","Kelvin Steel","indus"],["ORB","Orbit Machining","indus"]
+];
+const MARKET_TUNE = {
+  drift_mo: 0.0072,        // ~9%/yr market drift
+  market_vol_mo: 0.042,    // ~14.5%/yr
+  idio_vol_mo: 0.075,      // single-name noise → fat tails, drag on geometric return
+  blowup_chance_mo: 0.0016,// a name occasionally goes to almost nothing
+  blowup_size: 0.72,
+  bond_drift_mo: 0.0036, bond_vol_mo: 0.011,
+  spread: 0.002            // you pay to trade. quietly punishes churn.
+};
+
+/* =====================================================================
+   3. EVENTS — templated with slots, tagged by severity, drawn on a schedule.
+      Schema is frozen: adding content below is pure data entry.
+   ===================================================================== */
+const SLOTS = {
+  company: ["Novix Compute","Basin Petroleum","Goodward Stores","Atlas Freight","Meridian Health","Kelvin Steel","Lanpost Grocers"],
+  sector: ["technology","energy","healthcare","retail","logistics","manufacturing"],
+  percent: ["8","11","14","18","22","30"],
+  city: ["the county","your building","your zip code","the whole metro"],
+  thing: ["the water heater","the transmission","a molar","the upstairs pipes","your laptop"]
+};
+
+const EVENTS = [
+  /* ---- annoyance: dents one month ---- */
+  { id:"repair_small", tier:"annoyance", weight:10, requires:{},
+    effects:{ cash:[-180,-560] },
+    text:"{thing} gives out. The fix is ${amount}.", telegraph:null },
+  { id:"dental", tier:"annoyance", weight:8, requires:{},
+    effects:{ cash:[-260,-480], health:-1 },
+    text:"A filling cracks. ${amount} out of pocket, and you put off the crown.", telegraph:null },
+  { id:"wedding", tier:"annoyance", weight:8, requires:{ age_range:[22,45] },
+    effects:{ cash:[-340,-700], happy:+5 },
+    text:"A friend gets married in {city}. Flights, gift, the whole thing: ${amount}. Worth it.", telegraph:null },
+  { id:"utility_spike", tier:"annoyance", weight:7, requires:{},
+    effects:{ category_multipliers:{ amenities:1.5 }, months:2 },
+    text:"A cold snap hits {city}. Utilities run half again as high for two months.", telegraph:"Forecasters are calling for a hard winter." },
+  { id:"ticket", tier:"annoyance", weight:6, requires:{},
+    effects:{ cash:[-90,-220] },
+    text:"Parking ticket, ${amount}. You were four minutes late.", telegraph:null },
+  { id:"phone", tier:"annoyance", weight:6, requires:{},
+    effects:{ cash:[-300,-900] },
+    text:"Your phone hits the sidewalk face first. ${amount} to replace it.", telegraph:null },
+  { id:"raise_small", tier:"annoyance", weight:5, requires:{ employed:true },
+    effects:{ wage_mult:1.05, happy:+4 },
+    text:"Your manager fights for a 5% bump and gets it.", telegraph:null },
+
+  /* ---- month-breaker: forces reallocation ---- */
+  { id:"medical_bill", tier:"month_breaker", weight:9, requires:{},
+    effects:{ cash:[-1400,-3200], health:-4 },
+    text:"An urgent care visit turns into an imaging bill. ${amount} after insurance.", telegraph:null },
+  { id:"rent_hike", tier:"month_breaker", weight:9, requires:{ housed:true },
+    effects:{ rent_mult:[1.07,1.16] },
+    text:"Lease renewal. Rent goes up {percent}% and the landlord shrugs.", telegraph:"Rents in {city} are climbing again." },
+  { id:"car_death", tier:"month_breaker", weight:7, requires:{},
+    effects:{ cash:[-1900,-3600] },
+    text:"The transmission is gone. ${amount} to get moving again.", telegraph:"Something under the hood has started ticking." },
+  { id:"inflation", tier:"month_breaker", weight:7, requires:{},
+    effects:{ category_multipliers:{ food:1.12, amenities:1.10 }, months:999 },
+    text:"Prices in {sector} jump and stay jumped. Groceries and utilities cost more from here on.", telegraph:"Everything at the store looks a little more expensive." },
+  { id:"family_ask", tier:"month_breaker", weight:6, requires:{ age_range:[25,65] },
+    effects:{ cash:[-900,-2400], happy:+3 },
+    text:"Family needs ${amount}. You don't really consider saying no.", telegraph:null },
+  { id:"pet", tier:"month_breaker", weight:5, requires:{},
+    effects:{ cash:[-800,-2100], happy:+2 },
+    text:"The dog eats something it shouldn't. Emergency vet: ${amount}.", telegraph:null },
+  { id:"promotion", tier:"month_breaker", weight:5, requires:{ employed:true, age_range:[24,58] },
+    effects:{ wage_mult:1.16, happy:+8, hours:+3 },
+    text:"You get the promotion. More money, more hours, same amount of day.", telegraph:null },
+
+  /* ---- run-ender if unprepared: survivable with 3–6 months of expenses ---- */
+  { id:"layoff_industry", tier:"run_ender", weight:10, requires:{ age_range:[22,62], employed:true },
+    effects:{ job_status:"unemployed", unemployed_months:[2,6], health:-3, happy:-16 },
+    text:"{company} cuts {percent}% of staff across {sector}. Your desk is empty by Friday.",
+    telegraph:"Layoffs are spreading across {sector}." },
+  { id:"hospital", tier:"run_ender", weight:8, requires:{},
+    effects:{ cash:[-7000,-19000], health:-13, happy:-10 },
+    text:"Three nights in the hospital. The bill lands at ${amount} and it is not negotiable.",
+    telegraph:"You've been ignoring that pain for a while now." },
+  { id:"market_crash", tier:"run_ender", weight:8, requires:{ age_range:[22,90] },
+    effects:{ market_shock:[-0.42,-0.19], happy:-8 },
+    text:"Markets break. Everything you hold in {sector} and everywhere else drops {percent}%.",
+    telegraph:"Analysts are using the word 'overvalued' a lot lately." },
+  { id:"fraud", tier:"run_ender", weight:6, requires:{ holds_stock:true },
+    effects:{ single_stock_shock:-0.78, happy:-9 },
+    text:"A regulatory probe hits {company} in {sector}. The stock does not recover.",
+    telegraph:"There's chatter about accounting at one of your holdings." },
+  { id:"disability", tier:"run_ender", weight:6, requires:{ employed:true, age_range:[30,64] },
+    effects:{ income_mult:0.55, income_mult_months:[3,8], health:-9, happy:-12 },
+    text:"An injury puts you on partial leave. Income drops to 55% for a while.",
+    telegraph:"Your back has been talking to you." }
+];
+
+/* =====================================================================
+   4. HELPERS
+   ===================================================================== */
+let RNG = mulberry(Date.now() >>> 0);
+function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const rnd=(a,b)=>a+RNG()*(b-a);
+const rndi=(a,b)=>Math.floor(rnd(a,b+1));
+const pick=a=>a[Math.floor(RNG()*a.length)];
+function gauss(){ let u=0,v=0; while(!u)u=RNG(); while(!v)v=RNG(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const money=n=>(n<0?"-":"")+"$"+Math.abs(Math.round(n)).toLocaleString();
+const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function fillSlots(t,extra){
+  return t.replace(/\{(\w+)\}/g,(m,k)=>{
+    if(extra && extra[k]!=null) return extra[k];
+    return SLOTS[k] ? pick(SLOTS[k]) : m;
+  });
+}
+
+/* =====================================================================
+   5. STATE + LEDGER
+      Ledger entries: { date, category, planned, actual, rollover_rule }
+      Game mode generates them. Bookkeeping mode receives them. Both read
+      from the same model — that is the whole point of building it this way.
+   ===================================================================== */
+let S = null;
+
+function newCategory(id,name,kind,alloc,rule){
+  return { id, name, kind, alloc, jar:0, rule: rule||"carry", locked:kind==="rent" };
+}
+
+function newGame(mode, opts){
+  RNG = mulberry((Math.random()*4294967296)>>>0);
+  const job = TUNING.jobs[opts.job||"office"];
+  const house = TUNING.housing[opts.housing!=null?opts.housing:0];
+  S = {
+    mode, turn:0, year:TUNING.start_year, month:0,
+    age: TUNING.start_age, deathAge: rndi(TUNING.death_age_range[0],TUNING.death_age_range[1]),
+    jobKey: opts.job||"office", wage: job.wage, hours: job.hours,
+    employed:true, unemployedLeft:0, incomeMult:1, incomeMultLeft:0,
+    housingIdx: opts.housing!=null?opts.housing:0, rent: house.rent,
+    foodIdx:1, transIdx:0, amenIdx:1, entIdx:1,
+    cash: TUNING.start_cash,
+    health: TUNING.health_start, happy: TUNING.happy_start,
+    categories:[
+      newCategory("rent","Rent","rent",house.rent),
+      newCategory("food","Food","food",TUNING.food[1].cost),
+      newCategory("transport","Getting around","transport",TUNING.transport[0].cost),
+      newCategory("amenities","Utilities & phone","amenities",TUNING.amenities[1].cost),
+      newCategory("entertainment","Fun","entertainment",TUNING.entertainment[1].cost)
+    ],
+    mult:{},                    // active category multipliers {cat:{m,left}}
+    savings:0, bonds:0, index:0, retirement:0, contribPct:0.0,
+    stocks:{},                  // id -> shares
+    prices:{}, marketLevel:1, sectorLevel:{}, col:1,
+    tax:{ withheld:0, gross:0, months:0, lastFiledYear:TUNING.start_year-1, due:false, dueYear:null },
+    ledger:[], log:[], ticker:[],
+    missedRent:0, underfed:0, lastRunEnder:-99, scheduled:[],
+    peakNet:0, monthsLived:0, happySum:0, over:null, ending:null,
+    spentTotal:0, investedTotal:0
+  };
+  SECTORS.forEach(s=>S.sectorLevel[s.id]=1);
+  COMPANIES.forEach(([t])=>{ S.prices[t]=Math.round(rnd(18,140)*100)/100; S.stocks[t]=0; });
+  S.prices.INDEX=100; S.prices.BOND=50;
+  if(mode==="book"){ S.categories=S.categories.map(c=>({...c,alloc:0})); S.cash=0; }
+  logLine(mode==="book"
+    ? "Ledger started. Nothing here leaves your browser."
+    : `You're ${S.age}. ${job.name}. ${money(S.cash)} in the account and rent due on the first.`);
+  return S;
+}
+
+function netWorth(){
+  let v = S.cash + S.savings + S.bonds*S.prices.BOND + S.index*S.prices.INDEX + S.retirement;
+  for(const [t] of COMPANIES) v += (S.stocks[t]||0)*S.prices[t];
+  for(const c of S.categories) v += c.jar;
+  return v;
+}
+function monthlyBills(){
+  return S.rent + tierCost("food") + tierCost("transport") + tierCost("amenities");
+}
+function tierCost(kind){
+  const idx={food:S.foodIdx,transport:S.transIdx,amenities:S.amenIdx,entertainment:S.entIdx}[kind];
+  const base=TUNING[kind][idx].cost*(S.col||1);
+  const m=S.mult[kind];
+  return Math.round(base*(m?m.m:1));
+}
+function logLine(t,cls){ S.log.unshift({t,cls}); if(S.log.length>140)S.log.pop(); }
+
+/* =====================================================================
+   6. MARKET STEP
+   ===================================================================== */
+function stepMarket(){
+  const mk = MARKET_TUNE.drift_mo + MARKET_TUNE.market_vol_mo*gauss();
+  S.marketLevel *= (1+mk);
+  S.prices.INDEX = Math.max(1, S.prices.INDEX*(1+mk));
+  S.prices.BOND  = Math.max(1, S.prices.BOND*(1+MARKET_TUNE.bond_drift_mo+MARKET_TUNE.bond_vol_mo*gauss()));
+  const sr={};
+  for(const s of SECTORS){ const r = s.beta*mk + s.vol*gauss(); sr[s.id]=r; S.sectorLevel[s.id]*=(1+r); }
+  for(const [t,,sec] of COMPANIES){
+    let r = sr[sec] + MARKET_TUNE.idio_vol_mo*gauss();
+    if(RNG() < MARKET_TUNE.blowup_chance_mo) r = -MARKET_TUNE.blowup_size;
+    S.prices[t] = Math.max(0.25, S.prices[t]*(1+r));
+  }
+  S.savings *= (1+TUNING.savings_apy/12);
+  if(S.retirement>0) S.retirement *= (1+mk);
+}
+
+/* =====================================================================
+   7. ONE MONTH
+   ===================================================================== */
+function resolveMonth(report){
+  const job = TUNING.jobs[S.jobKey];
+  const date = `${MONTHS[S.month]} ${S.year}`;
+  S.monthsLived++; S.happySum += S.happy;
+
+  /* --- income --- */
+  let gross = 0;
+  if(S.employed && S.unemployedLeft<=0){
+    gross = S.wage * (S.incomeMultLeft>0 ? S.incomeMult : 1);
+  } else {
+    S.unemployedLeft = Math.max(0,S.unemployedLeft-1);
+    if(S.unemployedLeft===0 && !S.employed){
+      S.employed=true; S.wage=Math.round(S.wage*rnd(0.88,1.04));
+      logLine(`${date}: you land a new job at ${money(S.wage)}/month.`,"good");
+    }
+  }
+  if(S.incomeMultLeft>0) S.incomeMultLeft--;
+
+  const contrib = S.employed? gross*S.contribPct : 0;
+  const match   = S.employed? gross*Math.min(job.match, S.contribPct) : 0;
+  S.retirement += contrib + match;
+  const taxable = gross - contrib;
+  const withheld = taxable*(TAX_DATA.withholding_rate) + taxable*TAX_DATA.fica;
+  S.tax.withheld += withheld; S.tax.gross += taxable; S.tax.months++;
+  let take = taxable - withheld;
+  report.gross+=gross; report.tax+=withheld; report.take+=take; report.match+=match;
+
+  /* --- fill jars from take-home, remainder to cash --- */
+  let pool = take + 0;
+  const wanted = S.categories.reduce((a,c)=>a+c.alloc,0);
+  if(wanted>pool){
+    const scale = pool>0? pool/wanted : 0;
+    S.categories.forEach(c=>{ c.jar += c.alloc*scale; });
+    pool = 0;
+    report.overAllocated = true;
+  } else {
+    S.categories.forEach(c=>{ c.jar += c.alloc; });
+    pool -= wanted;
+  }
+  const leak = Math.max(0,pool)*TUNING.unbudgeted_leak;
+  S.cash += pool - leak;
+  report.leak += leak;
+
+  /* --- spend --- */
+  const need = {
+    rent: S.rent,
+    food: tierCost("food"),
+    transport: tierCost("transport"),
+    amenities: tierCost("amenities"),
+    entertainment: tierCost("entertainment")
+  };
+  for(const c of S.categories){
+    let req = need[c.kind] != null ? need[c.kind] : 0;     // custom jars spend nothing
+    if(c.kind==="entertainment") req = Math.max(req, c.jar); // you spend your fun money
+    let paid = 0;
+    if(req>0){
+      const fromJar = Math.min(c.jar, req); c.jar-=fromJar; paid+=fromJar;
+      if(paid<req){ const fromCash=Math.min(S.cash,req-paid); S.cash-=fromCash; paid+=fromCash; }
+      // rent, food, transport and utilities are not optional: sell something rather
+      // than miss them. Selling at a bad time is its own punishment.
+      if(paid<req && c.kind!=="entertainment" && c.kind!=="custom"){
+        const short=req-paid, left=payShock(short); paid+=short-left;
+      }
+    }
+    S.ledger.push({ date:`${S.year}-${String(S.month+1).padStart(2,"0")}`, category:c.name,
+                    planned:Math.round(c.alloc), actual:Math.round(paid), rollover_rule:c.rule });
+    report.rows[c.id] = report.rows[c.id] || {name:c.name,planned:0,actual:0,req:0,jar:0};
+    const r = report.rows[c.id];
+    r.planned+=c.alloc; r.actual+=paid; r.req+=req;
+    S.spentTotal += paid;
+
+    const ratio = req>0 ? paid/req : 1;
+    if(c.kind==="rent" && ratio < 0.995){
+      S.missedRent++;
+      logLine(`${date}: rent came up ${money(req-paid)} short. Notice ${S.missedRent} of 3.`,"bad");
+      if(S.missedRent>=3) return end("eviction");
+    } else if(c.kind==="rent"){ S.missedRent=Math.max(0,S.missedRent-1); }
+
+    if(c.kind==="food"){
+      const t=TUNING.food[S.foodIdx];
+      if(ratio<TUNING.min_viable_ratio){ S.underfed++; S.health += -2.6 + 2*ratio; if(ratio<0.4) S.happy-=1.5; }
+      else { S.underfed=0; S.health += t.health; }
+      S.happy += t.happy*ratio;
+    }
+    if(c.kind==="transport"){
+      const t=TUNING.transport[S.transIdx];
+      if(ratio<0.8){ S.happy-=1.2; if(S.employed && RNG()>0.94){ S.employed=false; S.unemployedLeft=rndi(1,3);
+        logLine(`${date}: you couldn't get to work often enough. They let you go.`,"bad"); } }
+      else S.happy += t.happy;
+    }
+    if(c.kind==="amenities"){ const t=TUNING.amenities[S.amenIdx];
+      if(ratio<0.8){ S.happy-=1.1; S.health-=0.4; } else { S.happy+=t.happy; S.health+=t.health; } }
+    if(c.kind==="entertainment"){ const t=TUNING.entertainment[S.entIdx], target=need.entertainment;
+      const r=target>0?paid/target:1;
+      S.happy += t.happy*clamp(r,0,1.4) - (r<0.5?0.5:0); }
+  }
+
+  /* --- jars that don't carry get swept to cash --- */
+  for(const c of S.categories){ if(c.rule==="sweep" && c.jar>0){ S.cash+=c.jar; c.jar=0; } }
+
+  /* --- health / happiness drift --- */
+  S.health += job.health_mo*(S.employed?1:0) - TUNING.health_decay;
+  S.happy  += job.happy_mo*(S.employed?1:0) - TUNING.mood_decay;
+  if(!S.employed) S.happy -= 1.4;
+  if(S.hours>50) S.health -= 0.2;
+  if(S.age>55) S.health -= (S.age-55)*0.010;
+  if(S.happy<18) S.health -= 0.7;
+  S.health=clamp(S.health,0,100); S.happy=clamp(S.happy,0,100);
+
+  /* --- expire multipliers --- */
+  for(const k in S.mult){ S.mult[k].left--; if(S.mult[k].left<=0) delete S.mult[k]; }
+
+  stepMarket();
+
+  if(S.health<=0){
+    if(S.underfed>=3) return end("starvation");
+    S.health=8;
+  }
+
+  /* --- clock --- */
+  S.month++; if(S.month>11){ S.month=0; S.year++; }
+  S.age = TUNING.start_age + S.monthsLived/12;
+  if(S.month===0){
+    const d=TUNING.cost_drift_yr;
+    S.col*=(1+d);
+    S.rent=Math.round(S.rent*(1+d));
+    const rc=S.categories.find(c=>c.kind==="rent"); if(rc) rc.alloc=Math.max(rc.alloc,S.rent);
+    if(S.employed) S.wage=Math.round(S.wage*(1+job.raise));
+    logLine(`${S.year}: lease renewed at ${money(S.rent)}. Food now ${money(tierCost("food"))}, `
+      +`getting around ${money(tierCost("transport"))}, utilities ${money(tierCost("amenities"))}.`);
+  }
+  S.peakNet=Math.max(S.peakNet,netWorth());
+  return null;
+}
+
+/* =====================================================================
+   8. SHOCKS — cash first, then jars, then investments. You are allowed to
+      survive by selling into a crash; you just won't enjoy it.
+   ===================================================================== */
+function payShock(amount){
+  let owed = amount, sold = 0;
+  const take = (avail,fn)=>{ if(owed<=0||avail<=0)return; const t=Math.min(avail,owed); fn(t); owed-=t; };
+  take(S.cash, t=>S.cash-=t);
+  for(const c of S.categories) if(c.kind==="custom") take(c.jar, t=>c.jar-=t);
+  for(const c of S.categories) if(c.kind==="entertainment") take(c.jar, t=>c.jar-=t);
+  for(const c of S.categories) if(c.kind!=="rent") take(c.jar, t=>c.jar-=t);
+  take(S.savings, t=>S.savings-=t);
+  take(S.bonds*S.prices.BOND, t=>{S.bonds-=t/S.prices.BOND; sold+=t;});
+  take(S.index*S.prices.INDEX, t=>{S.index-=t/S.prices.INDEX; sold+=t;});
+  for(const [t] of COMPANIES) take((S.stocks[t]||0)*S.prices[t], v=>{S.stocks[t]-=v/S.prices[t]; sold+=v;});
+  if(sold>100) logLine(`You sold ${money(sold)} of investments to cover it. Whatever the price was today, that's the price you got.`,"bad");
+  return owed;   // >0 means you could not pay
+}
+
+/* =====================================================================
+   9. EVENTS
+   ===================================================================== */
+function eligible(ev){
+  const r=ev.requires||{};
+  if(r.employed && !S.employed) return false;
+  if(r.housed && TUNING.jobs[S.jobKey].tier==="rotation") return false;
+  if(r.age_range && (S.age<r.age_range[0]||S.age>r.age_range[1])) return false;
+  if(r.holds_stock && !COMPANIES.some(([t])=>(S.stocks[t]||0)>0.001)) return false;
+  return true;
+}
+function drawEvent(tier){
+  const pool=EVENTS.filter(e=>e.tier===tier&&eligible(e));
+  if(!pool.length) return null;
+  let tot=pool.reduce((a,e)=>a+e.weight,0), r=RNG()*tot;
+  for(const e of pool){ r-=e.weight; if(r<=0) return e; }
+  return pool[0];
+}
+function applyEvent(ev){
+  const ef=ev.effects||{}, extra={};
+  if(ef.cash){ extra.amount=Math.abs(rndi(ef.cash[1],ef.cash[0])).toLocaleString(); }
+  if(ef.rent_mult){ const m=Array.isArray(ef.rent_mult)?rnd(ef.rent_mult[0],ef.rent_mult[1]):ef.rent_mult;
+    extra.percent=Math.round((m-1)*100); S.rent=Math.round(S.rent*m);
+    const rc=S.categories.find(c=>c.kind==="rent"); if(rc && rc.alloc<S.rent) rc.alloc=S.rent; }
+  if(ef.market_shock){ const m=rnd(ef.market_shock[0],ef.market_shock[1]); extra.percent=Math.abs(Math.round(m*100));
+    S.prices.INDEX*=(1+m); S.prices.BOND*=(1+m*0.25); S.retirement*=(1+m);
+    for(const [t] of COMPANIES) S.prices[t]=Math.max(0.25,S.prices[t]*(1+m*rnd(0.7,1.5))); }
+  if(ef.single_stock_shock){ const held=COMPANIES.filter(([t])=>(S.stocks[t]||0)>0.001);
+    if(held.length){ const c=pick(held); extra.company=c[1]; extra.sector=SECTORS.find(s=>s.id===c[2]).name.toLowerCase();
+      S.prices[c[0]]*=(1+ef.single_stock_shock); } }
+  const text=fillSlots(ev.text,extra);
+  let died=null;
+  if(ef.cash){ const amt=Number(String(extra.amount).replace(/,/g,"")); if(payShock(amt)>0) died="shock_cash"; }
+  if(ef.health) S.health=clamp(S.health+ef.health,0,100);
+  if(ef.happy)  S.happy=clamp(S.happy+ef.happy,0,100);
+  if(ef.wage_mult) S.wage=Math.round(S.wage*ef.wage_mult);
+  if(ef.hours) S.hours+=ef.hours;
+  if(ef.category_multipliers) for(const k in ef.category_multipliers){
+    const cur=S.mult[k]?S.mult[k].m:1;
+    S.mult[k]={ m:cur*ef.category_multipliers[k], left: ef.months||1 };
+  }
+  if(ef.job_status==="unemployed"){ S.employed=false; S.unemployedLeft=rndi(ef.unemployed_months[0],ef.unemployed_months[1]); }
+  if(ef.income_mult){ S.incomeMult=ef.income_mult; S.incomeMultLeft=rndi(ef.income_mult_months[0],ef.income_mult_months[1]); }
+  logLine(text, ev.tier==="run_ender"?"big":(ev.tier==="month_breaker"?"bad":null));
+  if(S.health<=0){ if(S.underfed>=3) died="starvation"; else S.health=6; }
+  return died;
+}
+function runEvents(){
+  let died=null;
+  const due=S.scheduled.filter(s=>s.turn<=S.turn);
+  S.scheduled=S.scheduled.filter(s=>s.turn>S.turn);
+  for(const d of due){ const ev=EVENTS.find(e=>e.id===d.id);
+    if(ev&&eligible(ev)){ S.lastRunEnder=S.turn; died=applyEvent(ev)||died; } }
+  const draws = clamp(1+Math.floor(stepMonths()/4),1,3);
+  for(let i=0;i<draws;i++){
+    const tier = (S.turn>=3 && RNG()<0.38) ? "month_breaker" : "annoyance";
+    const ev=drawEvent(tier); if(ev) died=applyEvent(ev)||died;
+  }
+  if(S.turn>=TUNING.first_run_ender_turn && S.turn-S.lastRunEnder>=TUNING.run_ender_cooldown
+     && !S.scheduled.length && RNG()<0.5){
+    const ev=drawEvent("run_ender");
+    if(ev){ S.scheduled.push({turn:S.turn+2,id:ev.id});
+      if(ev.telegraph) S.ticker.unshift(fillSlots(ev.telegraph,{})); S.ticker=S.ticker.slice(0,3); }
+  }
+  return died;
+}
+
+/* =====================================================================
+   10. TAXES
+   ===================================================================== */
+function taxLiability(grossYear, itemized){
+  const ded = itemized!=null && itemized>0 ? itemized : TAX_DATA.standard_deduction;
+  let inc = Math.max(0, grossYear - ded), owed = 0, prev = 0;
+  for(const b of TAX_DATA.brackets){
+    if(inc<=prev) break;
+    owed += (Math.min(inc,b.up_to)-prev)*b.rate; prev=b.up_to;
+  }
+  return owed + grossYear*TAX_DATA.fica;
+}
+function itemizableFor(){
+  // deterministic per year so the choice is a real one, not a coin flip
+  const r = mulberry((S.year*7919)>>>0);
+  const stateTax = Math.min(10000, S.tax.gross*0.045);
+  const charity  = Math.round(S.tax.gross*0.01*(0.4+r()*1.6));
+  const medical  = r()<0.28 ? Math.round(2000+r()*9000) : 0;
+  return { stateTax:Math.round(stateTax), charity, medical, total:Math.round(stateTax+charity+medical) };
+}
+// does the coming step cross an April filing deadline we owe?
+function owedTaxYear(monthsAhead){
+  let y=S.year,m=S.month;
+  for(let i=0;i<monthsAhead;i++){
+    if(m===TAX_DATA.filing_month && S.tax.lastFiledYear < y-1) return y-1;
+    m++; if(m>11){m=0;y++;}
+  }
+  return null;
+}
+function yearsCovered(){ return Math.max(1, S.tax.months/12); }
+// Once a turn covers more than a year, the deadline minigame stops being a
+// decision and becomes a tax on clicking. An accountant takes over.
+function autoFile(){
+  const it=itemizableFor(), yrs=yearsCovered();
+  const useIt=it.total/yrs>TAX_DATA.standard_deduction;
+  const liability=taxLiability(S.tax.gross/yrs, useIt?it.total/yrs:null)*yrs;
+  const diff=S.tax.withheld-liability;
+  if(diff>=0){ S.cash+=diff; logLine(`Your accountant filed the last ${Math.round(yrs)} years. Refunds totalling ${money(diff)}.`,"good"); }
+  else if(payShock(-diff)>0) return end("tax_debt");
+  else logLine(`Your accountant filed the last ${Math.round(yrs)} years. You owed ${money(-diff)}.`,"bad");
+  S.tax.withheld=0; S.tax.gross=0; S.tax.months=0; S.tax.due=false; S.tax.dueYear=null;
+  S.tax.lastFiledYear=S.year;
+  return null;
+}
+function fileTaxes(useItemized){
+  const it=itemizableFor(), yrs=yearsCovered();
+  const liability=taxLiability(S.tax.gross/yrs, useItemized?it.total:null)*yrs;
+  const diff=S.tax.withheld-liability;
+  const best=Math.max(it.total,TAX_DATA.standard_deduction);
+  const chose=useItemized?it.total:TAX_DATA.standard_deduction;
+  let msg;
+  if(diff>=0){ S.cash+=diff; msg=`Filed for ${S.tax.lastFiledYear+1}. Refund of ${money(diff)} lands in your account.`; }
+  else {
+    const owe=-diff;
+    if(payShock(owe)>0){ S.tax.lastFiledYear=S.year-1; return end("tax_debt"); }
+    msg=`Filed for ${S.tax.lastFiledYear+1}. You underwithheld and owe ${money(owe)}.`;
+  }
+  if(chose<best) msg+=` You took the ${useItemized?"itemized":"standard"} deduction and left ${money(best-chose)} of deductions on the table.`;
+  logLine(msg, diff>=0?"good":"bad");
+  S.tax.lastFiledYear = S.tax.dueYear!=null ? S.tax.dueYear : S.year-1;
+  S.tax.withheld=0; S.tax.gross=0; S.tax.months=0; S.tax.due=false; S.tax.dueYear=null;
+  return null;
+}
+
+/* =====================================================================
+   11. TURN LOOP — the step grows by one month each turn.
+   ===================================================================== */
+function stepMonths(){ return S.mode==="book" ? 1 : Math.min(S.turn+1, 24); }
+
+function advance(){
+  if(S.over) return;
+  const months=stepMonths();
+  if(S.mode!=="book"){
+    const owed=owedTaxYear(months);
+    if(owed!=null && S.tax.lastFiledYear<owed){
+      if(months<=12){ end("tax_deadline"); render(); showEnd(); return; }
+      if(autoFile()){ render(); showEnd(); return; }
+    }
+  }
+  const report={ months, from:`${MONTHS[S.month]} ${S.year}`, gross:0, tax:0, take:0, match:0, leak:0, rows:{}, overAllocated:false,
+                 netBefore:netWorth(), events:S.log.length };
+  for(let i=0;i<months;i++){
+    const died = S.mode==="book" ? resolveBookMonth(report) : resolveMonth(report);
+    if(died){ render(); showEnd(); return; }
+  }
+  S.turn++;
+  if(S.mode!=="book"){
+    const died=runEvents();
+    if(died){ end(died); render(); showEnd(); return; }
+    if(S.age>=S.deathAge){ end("old_age"); render(); showEnd(); return; }
+    S.tax.dueYear=owedTaxYear(stepMonths());
+    S.tax.due=S.tax.dueYear!=null;
+  }
+  report.netAfter=netWorth();
+  report.to=`${MONTHS[S.month]} ${S.year}`;
+  render(); showReport(report);
+  save(true);
+}
+
+/* =====================================================================
+   12. ENDINGS + SCORE
+      Open question answered: score is net worth AND happiness, shown as two
+      numbers plus a combined figure, because optimising either one alone
+      produces a life nobody wants.
+   ===================================================================== */
+const ENDINGS = {
+  eviction:     { title:"Evicted", line:"Three missed months and the locks changed." },
+  starvation:   { title:"Your health gave out", line:"You cut the food line until there was nothing left to cut." },
+  tax_deadline: { title:"You missed the filing deadline", line:"The letter is certified. The run is over." },
+  tax_debt:     { title:"You couldn't pay what you owed", line:"Underwithheld all year, nothing set aside, and the bill came due." },
+  shock_cash:   { title:"Wiped out", line:"The bill arrived and there was nothing behind it. No cash, no jars, nothing to sell." },
+  old_age:      { title:"You made it", line:"You reached the end of the run on your own terms." }
+};
+function end(kind){ if(!S.over){ S.over=kind; S.ending=ENDINGS[kind]; } return kind; }
+function scoreRun(){
+  const nw=netWorth(), avgHappy=S.monthsLived?S.happySum/S.monthsLived:0;
+  return { nw, avgHappy, years:(S.monthsLived/12),
+           total: Math.round(nw*(0.5+avgHappy/100)) };
+}
+
+/* =====================================================================
+   13. POST-MORTEM — the rules engine already decided. The model only talks.
+   ===================================================================== */
+const CANNED = {
+  eviction:["Rent is the one bill that ends the run on its own. You funded everything else first and hoped the landlord was sentimental.","Fund rent to the dollar before anything else gets a cent."],
+  starvation:["You treated the food jar as the flexible one. It is not flexible. It is the one that keeps you alive.","Groceries are not the place to find your savings rate."],
+  tax_deadline:["You had a year of warning and a button that said file. The IRS does not accept 'I was busy'.","File the moment the window opens. It takes one click."],
+  tax_debt:["Withholding covered most of it and you spent the rest. April does not care what you spent it on.","If you owe every year, set the money aside every month."],
+  shock_cash:["No emergency fund. The shock was survivable — you just had nothing to survive it with.","Three to six months of expenses, in cash, untouched. That's the whole lesson."],
+  old_age:["You got to the end without being wiped out, which is more than most runs manage.","Now check whether the index fund beat your stock picks. It usually does."]
+};
+async function postMortem(){
+  const s=scoreRun(), k=S.over;
+  const facts={ ending:k, age:Math.round(S.age), years:Math.round(s.years), net_worth:Math.round(s.nw),
+    avg_happiness:Math.round(s.avgHappy), health:Math.round(S.health),
+    cash:Math.round(S.cash), savings:Math.round(S.savings),
+    index_value:Math.round(S.index*S.prices.INDEX), retirement:Math.round(S.retirement),
+    stock_value:Math.round(COMPANIES.reduce((a,[t])=>a+(S.stocks[t]||0)*S.prices[t],0)),
+    had_emergency_category: S.categories.some(c=>c.kind==="custom"),
+    missed_rent_notices:S.missedRent, job:TUNING.jobs[S.jobKey].name,
+    employer_match_used: S.contribPct>0 };
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, messages:[{role:"user",content:
+`You are the narrator of a budgeting game. Here is the run: ${JSON.stringify(facts)}
+Reply with ONLY a JSON object, no markdown fences, no preamble:
+{"summary":"two sentences on what they did right and wrong, specific to these numbers","roast":"one short cheeky line, under 20 words, that names the mistake"}`}] })
+    });
+    const d=await res.json();
+    const txt=d.content.filter(b=>b.type==="text").map(b=>b.text).join("").replace(/```json|```/g,"").trim();
+    const j=JSON.parse(txt);
+    if(j.summary&&j.roast) return [j.summary,j.roast];
+  }catch(e){}
+  return CANNED[k]||CANNED.old_age;
+}
+
+/* =====================================================================
+   14. SAVE / LOAD
+   ===================================================================== */
+const KEY="xpenses_save_v1";
+function save(quiet){
+  try{ localStorage.setItem(KEY,JSON.stringify(S)); if(!quiet) toast("Saved to this browser."); }
+  catch(e){ if(!quiet) toast("Browser storage is full or blocked. Use Download save."); }
+}
+function loadLocal(){ try{ const r=localStorage.getItem(KEY); if(!r) return false; S=JSON.parse(r); return true; }catch(e){ return false; } }
+function download(name,text,type){
+  const b=new Blob([text],{type:type||"application/json"}), u=URL.createObjectURL(b);
+  const a=document.createElement("a"); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),800);
+}
+function exportCSV(){
+  const rows=[["date","category","planned","actual","rollover_rule"]].concat(
+    S.ledger.map(e=>[e.date,e.category,e.planned,e.actual,e.rollover_rule]));
+  download("ledger.csv",rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n"),"text/csv");
+}
+function importFile(file,cb){ const fr=new FileReader(); fr.onload=()=>{ try{ S=JSON.parse(fr.result); cb(true);}catch(e){ cb(false);} }; fr.readAsText(file); }
+
+/* =====================================================================
+   15. THE HOUSE — a navigable menu, not a lived space. Nothing ticks while
+        you stand here. Every object has a keyboard shortcut so turn 25
+        doesn't feel like turn 1 with extra walking.
+   ===================================================================== */
+const SRC={x:0,y:55,w:200,h:145}, PX=4;
+const SPOTS=[
+  {id:"terminal", key:"t", label:"Terminal",      r:[131,117,23,15],  stand:[143,158]},
+  {id:"keys",     key:"c", label:"Getting around",r:[106,120,18,10],  stand:[116,158]},
+  {id:"desk",     key:"d", label:"Desk",          r:[119,128,42,15],  stand:[133,162]},
+  {id:"fridge",   key:"f", label:"Fridge",        r:[84,99,30,22],    stand:[92,150]},
+  {id:"storage",  key:"s", label:"Storage",       r:[100,131,33,21],  stand:[110,160]},
+  {id:"jars",     key:"j", label:"Xpenses board", r:[3,96,49,32],     stand:[33,152]},
+  {id:"couch",    key:"h", label:"Couch",         r:[2,129,64,42],    stand:[42,172]},
+  {id:"tv",       key:"v", label:"TV",            r:[80,150,40,27],   stand:[100,182]},
+  {id:"door",     key:" ", label:"Step out",      r:[164,100,28,60],  stand:[166,160]}
+];
+let cv,ctx,roomImg,hover=null,av={x:85,y:168,tx:85,ty:168,walking:false,t:0,then:null,pending:null};
+
+function initRoom(){
+  cv=document.getElementById("room"); if(!cv) return;
+  cv.width=SRC.w*PX; cv.height=SRC.h*PX; ctx=cv.getContext("2d"); ctx.imageSmoothingEnabled=false;
+  if(!roomImg){ roomImg=new Image(); roomImg.onload=()=>frame(performance.now()); roomImg.src="data:image/png;base64,"+ROOM_B64; }
+  cv.onmousemove=e=>{ const p=pt(e); hover=hitSpot(p.x,p.y); cv.style.cursor=hover?"pointer":"default"; };
+  cv.onmouseleave=()=>{hover=null;};
+  cv.onclick=e=>{ const p=pt(e); const s=hitSpot(p.x,p.y); if(s) goTo(s); };
+  if(!loopStarted){ loopStarted=true; requestAnimationFrame(frame); }
+}
+function pt(e){ const b=cv.getBoundingClientRect();
+  return { x:(e.clientX-b.left)*(cv.width/b.width)/PX+SRC.x, y:(e.clientY-b.top)*(cv.height/b.height)/PX+SRC.y }; }
+function hitSpot(x,y){ for(const s of SPOTS){ const[a,b,w,h]=s.r; if(x>=a&&x<=a+w&&y>=b&&y<=b+h) return s; } return null; }
+function goTo(s){
+  if(S.over) return;
+  av.tx=s.stand[0]; av.ty=s.stand[1]; av.walking=true; av.t=0; av.pending=s.id;
+  const d=Math.hypot(av.tx-av.x,av.ty-av.y);
+  if(d<3){ av.walking=false; openSpot(s.id); }
+}
+function jump(s){ av.x=s.stand[0]; av.y=s.stand[1]; av.tx=av.x; av.ty=av.y; av.walking=false; openSpot(s.id); }
+function frame(now){
+  requestAnimationFrame(frame);
+  if(!ctx||!cv||!cv.isConnected||!roomImg||!roomImg.complete) return;
+  const dt=av.then?Math.min(50,now-av.then):16; av.then=now;
+  if(av.walking){
+    const dx=av.tx-av.x, dy=av.ty-av.y, d=Math.hypot(dx,dy), sp=0.075*dt;
+    if(d<=sp){ av.x=av.tx; av.y=av.ty; av.walking=false; const p=av.pending; av.pending=null; if(p) openSpot(p); }
+    else { av.x+=dx/d*sp; av.y+=dy/d*sp; av.t+=dt; }
+  }
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.drawImage(roomImg,SRC.x,SRC.y,SRC.w,SRC.h,0,0,cv.width,cv.height);
+  drawAvatar();
+  if(hover) drawHover(hover);
+  if(S && S.tax && S.tax.due) drawBadge();
+}
+function R(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(Math.round((x-SRC.x)*PX),Math.round((y-SRC.y)*PX),w*PX,h*PX); }
+function drawAvatar(){
+  const x=Math.round(av.x), y=Math.round(av.y);
+  const bob=av.walking&&Math.floor(av.t/130)%2?1:0;
+  ctx.globalAlpha=.22; R(x-4,y-1,8,2,"#000"); ctx.globalAlpha=1;
+  R(x-4,y-15,8,15,"#000");                       // outline block
+  R(x-3,y-14,6,5,"#F5C9A0");                     // head
+  R(x-3,y-9,6,6,"#00B7EF");                      // shirt
+  R(x-3,y-3,2,3-bob,"#174D05"); R(x+1,y-3,2,3-(1-bob),"#174D05"); // legs
+  R(x-2,y-13,1,1,"#000"); R(x,y-13,1,1,"#000");
+}
+function drawHover(s){
+  const [a,b,w,h]=s.r, X=(a-SRC.x)*PX, Y=(b-SRC.y)*PX;
+  ctx.lineWidth=3; ctx.strokeStyle="#00B7EF"; ctx.strokeRect(X-1,Y-1,w*PX+2,h*PX+2);
+  const label=s.label+"  ["+(s.key===" "?"space":s.key.toUpperCase())+"]";
+  ctx.font="700 15px system-ui,sans-serif"; const tw=ctx.measureText(label).width;
+  let lx=Math.min(Math.max(4,X+w*PX/2-tw/2-7),cv.width-tw-18), ly=Math.max(4,Y-30);
+  ctx.fillStyle="#000"; ctx.fillRect(lx,ly,tw+14,26);
+  ctx.fillStyle="#F5E49C"; ctx.fillText(label,lx+7,ly+18);
+}
+function drawBadge(){
+  const t="Taxes due this step";
+  ctx.font="700 15px system-ui,sans-serif"; const w=ctx.measureText(t).width;
+  ctx.fillStyle="#ED1C24"; ctx.fillRect(cv.width-w-26,10,w+16,28);
+  ctx.strokeStyle="#000"; ctx.lineWidth=3; ctx.strokeRect(cv.width-w-26,10,w+16,28);
+  ctx.fillStyle="#fff"; ctx.fillText(t,cv.width-w-18,29);
+}
+
+/* =====================================================================
+   16. UI
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const app=$("#app"), veil=$("#veil"), panel=$("#panel");
+let loopStarted=false, lockPanel=false;
+function toast(msg){ const t=document.createElement("div");
+  t.style.cssText="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#000;color:#fff;border:3px solid #22FF00;padding:8px 14px;z-index:99;font-weight:700";
+  t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1900); }
+function openPanel(html,mount){ if(lockPanel) return; panel.innerHTML=html; veil.hidden=false; if(mount)mount(); const f=panel.querySelector("input,button,select"); if(f)f.focus(); }
+function closePanel(){ if(lockPanel) return; veil.hidden=true; panel.innerHTML=""; }
+veil.addEventListener("mousedown",e=>{ if(e.target===veil) closePanel(); });
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ closePanel(); return; }
+  if(!S||S.over||!veil.hidden) return;
+  if(e.target.matches("input,select,textarea")) return;
+  if(e.key===" "){ e.preventDefault(); advance(); return; }
+  if(S.mode==="book"){ if(e.key.toLowerCase()==="j") openJars(); return; }
+  const s=SPOTS.find(s=>s.key===e.key.toLowerCase());
+  if(s){ e.preventDefault(); jump(s); }
+});
+
+function head(){
+  const s=scoreRun();
+  const game=S.mode!=="book";
+  return `<div class="topbar">
+    <div class="brand">X<span>penses</span></div>
+    ${game?`<div class="stat">age <b>${Math.floor(S.age)}</b></div>`:""}
+    <div class="stat">${MONTHS[S.month]} <b>${S.year}</b></div>
+    <div class="stat">turn <b>${S.turn+1}</b> · next step <b>${stepMonths()}mo</b></div>
+    <div class="stat">cash <b class="m">${money(S.cash)}</b></div>
+    <div class="stat">net worth <b class="m">${money(netWorth())}</b></div>
+    <div class="grow"></div>
+    ${S.tax&&S.tax.due?`<button class="btn warn sm" id="btax">File taxes now</button>`:""}
+    <button class="btn go" id="badv">Advance ${stepMonths()} month${stepMonths()>1?"s":""}</button>
+  </div>`;
+}
+function jarsRail(){
+  const take=estTakeHome(), tot=S.categories.reduce((a,c)=>a+c.alloc,0);
+  return `<div class="slab">
+    <h2>Jars</h2>
+    ${S.categories.map(c=>{
+      const pct=take>0?Math.round(c.alloc/take*100):0;
+      const fill=c.alloc>0?Math.min(100,(c.jar/Math.max(c.alloc,1))*100):0;
+      return `<div class="jar">
+        <div class="jarrow"><span class="n">${esc(c.name)}</span><span class="v">${money(c.alloc)}</span></div>
+        <div class="bar"><i class="${c.kind==="custom"?"save":""}" style="width:${clamp(fill,0,100)}%"></i></div>
+        <div class="jarrow"><span style="color:var(--chalk-dim);font-size:11px">${pct}% of take-home</span><span style="color:var(--chalk-dim);font-size:11px">carried ${money(c.jar)}</span></div>
+      </div>`;}).join("")}
+    <div class="hr"></div>
+    <div class="jarrow"><span class="n">Allocated</span><span class="v" style="color:${tot>take?"var(--rust)":"var(--money)"}">${money(tot)} / ${money(take)}</span></div>
+    <button class="btn ghost sm" id="bjars" style="margin-top:10px;width:100%">Edit jars [J]</button>
+  </div>`;
+}
+function estTakeHome(){
+  if(S.mode==="book") return S.bookIncome||0;
+  if(!S.employed) return 0;
+  const g=S.wage*(1-S.contribPct);
+  return Math.round(g-g*(TAX_DATA.withholding_rate+TAX_DATA.fica));
+}
+function railRight(){
+  const game=S.mode!=="book";
+  return `${game?`<div class="slab" style="margin-bottom:14px">
+    <h2>Where you're at</h2>
+    ${meter("Health",S.health,"#22FF00")}${meter("Mood",S.happy,"#00B7EF")}
+    ${S.ticker.length?`<div class="hr"></div>${S.ticker.map(t=>`<div class="tick"><b>·</b> ${esc(t)}</div>`).join("")}`:""}
+  </div>`:""}
+  <div class="slab"><h2>What happened</h2>
+    <div class="log">${S.log.length?S.log.map(l=>`<p class="${l.cls||""}">${esc(l.t)}</p>`).join(""):"<p>Nothing yet. Set your jars and step out.</p>"}</div>
+  </div>`;
+}
+function meter(t,v,c){ return `<div class="meter"><span class="t">${t}</span><span class="b"><i style="width:${clamp(v,0,100)}%;background:${v<25?"#ED1C24":c}"></i></span><span>${Math.round(v)}</span></div>`; }
+
+function render(){
+  if(!S){ return titleScreen(); }
+  const game=S.mode!=="book";
+  app.innerHTML=head()+`<div class="cols">
+    <div>${jarsRail()}</div>
+    <div class="stage">
+      ${game?`<canvas id="room" aria-label="Your home. Click furniture to open panels."></canvas>`
+            :`<div class="note" style="margin:0">Bookkeeping mode. No clock, no shocks, no scores — just the ledger. Nothing leaves your browser.</div>`}
+      <div class="roomfoot">
+        <button class="btn ghost sm" id="bdash">All panels [Tab]</button>
+        <button class="btn ghost sm" id="bsave">Save</button>
+        <button class="btn ghost sm" id="bdl">Download save</button>
+        <button class="btn ghost sm" id="bcsv">Export CSV</button>
+        <span class="hint">${game?"click furniture · J F S C V D T · space advances":"enter what you actually spent, then advance"}</span>
+      </div>
+    </div>
+    <div class="rail-r">${railRight()}</div>
+  </div>`;
+  if(game) initRoom(); 
+  $("#badv").onclick=advance;
+  $("#bjars").onclick=()=>openJars();
+  $("#bdash").onclick=dashboard;
+  $("#bsave").onclick=()=>save(false);
+  $("#bdl").onclick=()=>download("xpenses-save.json",JSON.stringify(S,null,1));
+  $("#bcsv").onclick=exportCSV;
+  if($("#btax")) $("#btax").onclick=openTaxes;
+}
+document.addEventListener("keydown",e=>{ if(e.key==="Tab"&&S&&!S.over&&veil.hidden){ e.preventDefault(); dashboard(); } });
+
+function dashboard(){
+  openPanel(`<div class="phead"><div><h3>Every panel, no walking</h3>
+    <p class="sub">Turn 1 the house is charming. Turn 25 it is a corridor.</p></div>
+    <button class="x" id="cx">×</button></div>
+    <div class="hr"></div>
+    <div class="tiers">${(S.mode==="book"?SPOTS.filter(s=>s.id==="jars"):SPOTS.filter(s=>s.id!=="door")).map(s=>
+      `<button class="tier" data-go="${s.id}"><b>${s.label}</b><small>shortcut ${s.key.toUpperCase()}</small></button>`).join("")}
+      <button class="tier" data-go="advance"><b>Advance ${stepMonths()} months</b><small>shortcut space</small></button>
+    </div>`,()=>{
+      $("#cx").onclick=closePanel;
+      panel.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{
+        const id=b.dataset.go; closePanel();
+        if(id==="advance") advance(); else openSpot(id);
+      });
+    });
+}
+function openSpot(id){
+  if(id==="door"){ closePanel(); advance(); return; }
+  ({jars:openJars,fridge:()=>openTier("food","Fridge","What you eat is the first thing people cut and the last thing they should."),
+    storage:()=>openTier("amenities","Storage","Utilities, phone, the things that quietly renew."),
+    keys:()=>openTier("transport","Car keys","If you can't get to work, the job stops paying."),
+    tv:()=>openTier("entertainment","TV","A life with no fun in it is a life you quit."),
+    desk:openDesk, terminal:openTerminal, couch:openCouch}[id]||openJars)();
+}
+
+/* ---------- jars ---------- */
+function openJars(){
+  const book=S.mode==="book";
+  const take=estTakeHome();
+  const rows=S.categories.map((c,i)=>`<tr>
+    <td>${c.locked?"🔒 ":""}${esc(c.name)}</td>
+    <td class="r"><input type="number" min="0" step="10" value="${Math.round(c.alloc)}" data-a="${i}" style="width:96px"></td>
+    ${book?`<td class="r"><input type="number" min="0" step="10" value="${Math.round(c.actualInput||0)}" data-x="${i}" style="width:96px"></td>`:""}
+    <td class="r">${money(c.jar)}</td>
+    <td class="r"><select data-r="${i}" style="width:88px">
+      <option value="carry"${c.rule==="carry"?" selected":""}>carry</option>
+      <option value="sweep"${c.rule==="sweep"?" selected":""}>sweep</option></select></td>
+    <td class="r">${c.kind==="custom"?`<button class="btn warn sm" data-d="${i}">remove</button>`:""}</td></tr>`).join("");
+  openPanel(`<div class="phead"><div><h3>Jars</h3>
+    <p class="sub">Money goes in every month. What you don't spend stays in the jar.</p></div>
+    <button class="x" id="cx">×</button></div>
+    <div class="hr"></div>
+    <table><thead><tr><th>Category</th><th class="r">Per month</th>${book?'<th class="r">Actually spent</th>':""}
+      <th class="r">In the jar</th><th class="r">Leftover</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    ${book?"":`<div class="note">Take-home is about <span class="money">${money(take)}</span> a month.
+      Allocate more than that and every jar fills short. Leave money unallocated and about
+      ${Math.round(TUNING.unbudgeted_leak*100)}% of it disappears into spending you won't remember —
+      so if you want savings, give savings a jar.</div>`}
+    <div class="row">
+      <input type="text" id="newname" placeholder="Name a new category" style="flex:1 1 180px">
+      <button class="btn sm" id="addcat">Add category</button>
+      <button class="btn ghost sm" id="balance">Fit to take-home</button>
+    </div>
+    <div class="row"><button class="btn go" id="done">Done</button></div>`,()=>{
+    $("#cx").onclick=$("#done").onclick=()=>{closePanel();render();};
+    panel.querySelectorAll("[data-a]").forEach(inp=>inp.onchange=()=>{
+      const c=S.categories[+inp.dataset.a]; let v=Math.max(0,+inp.value||0);
+      if(c.kind==="rent"&&v<S.rent&&S.mode!=="book"){ toast(`Rent is ${money(S.rent)}. You can under-fund it, but the notices start.`); }
+      c.alloc=v; render(); });
+    panel.querySelectorAll("[data-x]").forEach(inp=>inp.onchange=()=>{ S.categories[+inp.dataset.x].actualInput=Math.max(0,+inp.value||0); });
+    panel.querySelectorAll("[data-r]").forEach(sel=>sel.onchange=()=>{ S.categories[+sel.dataset.r].rule=sel.value; });
+    panel.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{
+      const c=S.categories[+b.dataset.d]; S.cash+=c.jar; S.categories.splice(+b.dataset.d,1); openJars(); render(); });
+    $("#addcat").onclick=()=>{ const n=$("#newname").value.trim(); if(!n) return;
+      S.categories.push(newCategory("c"+Date.now(),n,"custom",0)); openJars(); render(); };
+    $("#balance").onclick=()=>{ const tot=S.categories.reduce((a,c)=>a+c.alloc,0); if(!tot) return;
+      const k=estTakeHome()/tot; S.categories.forEach(c=>c.alloc=Math.round(c.alloc*k)); openJars(); render(); };
+  });
+}
+
+/* ---------- tier panels ---------- */
+const TIERKEY={food:"foodIdx",transport:"transIdx",amenities:"amenIdx",entertainment:"entIdx"};
+function openTier(kind,title,sub){
+  const idx=S[TIERKEY[kind]];
+  openPanel(`<div class="phead"><div><h3>${title}</h3><p class="sub">${sub}</p></div>
+    <button class="x" id="cx">×</button></div><div class="hr"></div>
+    <div class="tiers">${TUNING[kind].map((t,i)=>`<button class="tier" aria-pressed="${i===idx}" data-t="${i}">
+      <b>${t.name}</b><small>${money(t.cost)} / month</small></button>`).join("")}</div>
+    <div class="note">This month's bill: <span class="money">${money(tierCost(kind))}</span>${S.mult[kind]?" — currently inflated by an event.":""}
+      Fund it below ${Math.round(TUNING.min_viable_ratio*100)}% and it starts costing you something other than money.</div>
+    <div class="row"><button class="btn go" id="done">Done</button></div>`,()=>{
+    $("#cx").onclick=$("#done").onclick=()=>{closePanel();render();};
+    panel.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{
+      S[TIERKEY[kind]]=+b.dataset.t;
+      const c=S.categories.find(c=>c.kind===kind); if(c) c.alloc=tierCost(kind);
+      openTier(kind,title,sub); render(); });
+  });
+}
+
+/* ---------- couch ---------- */
+function openCouch(){
+  const last=S.ledger.slice(-10).reverse();
+  openPanel(`<div class="phead"><div><h3>Sit down a minute</h3><p class="sub">How you're actually doing.</p></div>
+    <button class="x" id="cx">×</button></div><div class="hr"></div>
+    ${meter("Health",S.health,"#22FF00")}${meter("Mood",S.happy,"#00B7EF")}
+    <div class="note">${S.health<40?"Your health is slipping. Food and hours are the two things driving it.":
+      S.happy<35?"You are running on empty. Something in the fun jar would help.":"Nothing here is on fire."}</div>
+    ${S.ticker.length?`<h2 style="font-size:14px;color:var(--cream)">Word going around</h2>${S.ticker.map(t=>`<div class="tick">${esc(t)}</div>`).join("")}`:""}
+    <div class="hr"></div>
+    <table><thead><tr><th>Month</th><th>Category</th><th class="r">Planned</th><th class="r">Spent</th></tr></thead>
+    <tbody>${last.map(e=>`<tr><td>${e.date}</td><td>${esc(e.category)}</td><td class="r">${money(e.planned)}</td>
+      <td class="r ${e.actual>e.planned?"neg":"pos"}">${money(e.actual)}</td></tr>`).join("")||"<tr><td>No months yet.</td></tr>"}</tbody></table>`,
+    ()=>{ $("#cx").onclick=()=>{closePanel();render();}; });
+}
+
+/* ---------- desk: job, retirement, housing, taxes ---------- */
+function openDesk(){
+  const job=TUNING.jobs[S.jobKey];
+  openPanel(`<div class="phead"><div><h3>Desk</h3><p class="sub">${esc(job.note)}</p></div>
+    <button class="x" id="cx">×</button></div><div class="hr"></div>
+    <table><tbody>
+      <tr><td>Job</td><td class="r">${job.name}${S.employed?"":" — laid off"}</td></tr>
+      <tr><td>Gross pay</td><td class="r pos">${money(S.wage)} / month</td></tr>
+      <tr><td>Hours</td><td class="r">${S.hours} / week</td></tr>
+      <tr><td>Take-home after withholding</td><td class="r pos">${money(estTakeHome())}</td></tr>
+      <tr><td>Rent</td><td class="r">${money(S.rent)}</td></tr>
+      <tr><td>Retirement balance</td><td class="r pos">${money(S.retirement)}</td></tr>
+    </tbody></table>
+    <label class="f">Retirement contribution — employer matches the first ${Math.round(job.match*100)}%</label>
+    <input type="range" id="contrib" min="0" max="15" step="1" value="${Math.round(S.contribPct*100)}">
+    <div class="jarrow"><span id="clabel" class="money">${Math.round(S.contribPct*100)}% · ${money(S.wage*S.contribPct)}/mo</span>
+      <span class="money" id="mlabel">employer adds ${money(S.wage*Math.min(job.match,S.contribPct))}</span></div>
+    ${S.contribPct<job.match?`<div class="note">You are leaving <span class="money">${money(S.wage*(job.match-S.contribPct)*12)}</span> a year of free money on the table.</div>`:""}
+    <div class="hr"></div>
+    <h2 style="font-size:14px;color:var(--cream)">Taxes</h2>
+    <p class="sub">${S.tax.due?`A return for ${S.tax.dueYear} is due before you advance past April. Miss it and the run ends.`
+      :`Withheld so far: ${money(S.tax.withheld)} on ${money(S.tax.gross)} of pay. Next return due April ${S.tax.lastFiledYear+2}.`}</p>
+    <div class="row">${S.tax.due?`<button class="btn warn" id="file">File the return</button>`:""}
+      <button class="btn ghost" id="movehouse">Move</button>
+      <button class="btn go" id="done">Done</button></div>`,()=>{
+    $("#cx").onclick=$("#done").onclick=()=>{closePanel();render();};
+    const r=$("#contrib");
+    r.oninput=()=>{ S.contribPct=+r.value/100;
+      $("#clabel").textContent=`${r.value}% · ${money(S.wage*S.contribPct)}/mo`;
+      $("#mlabel").textContent=`employer adds ${money(S.wage*Math.min(job.match,S.contribPct))}`; };
+    r.onchange=()=>render();
+    if($("#file")) $("#file").onclick=openTaxes;
+    $("#movehouse").onclick=openHousing;
+  });
+}
+function openHousing(){
+  openPanel(`<div class="phead"><div><h3>Move</h3><p class="sub">One month's rent up front, and your rent jar resets.</p></div>
+    <button class="x" id="cx">×</button></div><div class="hr"></div>
+    <div class="tiers">${TUNING.housing.map((h,i)=>`<button class="tier" aria-pressed="${i===S.housingIdx}" data-h="${i}">
+      <b>${h.name}</b><small>${money(h.rent)} / month</small></button>`).join("")}</div>
+    <div class="row"><button class="btn go" id="done">Done</button></div>`,()=>{
+    $("#cx").onclick=$("#done").onclick=()=>{closePanel();render();};
+    panel.querySelectorAll("[data-h]").forEach(b=>b.onclick=()=>{
+      const i=+b.dataset.h, h=TUNING.housing[i];
+      if(i===S.housingIdx) return;
+      if(S.cash<h.rent){ toast("Not enough cash for the deposit."); return; }
+      S.cash-=h.rent; S.housingIdx=i; S.rent=h.rent;
+      const rc=S.categories.find(c=>c.kind==="rent"); rc.alloc=h.rent; rc.jar=0;
+      logLine(`Moved into the ${h.name.toLowerCase()}. Rent is now ${money(h.rent)}.`);
+      openHousing(); render(); });
+  });
+}
+function openTaxes(){
+  const it=itemizableFor();
+  openPanel(`<div class="phead"><div><h3>Return for ${S.tax.dueYear||S.year-1}</h3>
+    <p class="sub">Pick the bigger deduction. That's the whole job.</p></div><button class="x" id="cx">×</button></div>
+    <div class="hr"></div>
+    <table><tbody>
+      <tr><td>Pay reported</td><td class="r">${money(S.tax.gross)}</td></tr>
+      <tr><td>Already withheld</td><td class="r pos">${money(S.tax.withheld)}</td></tr>
+      <tr><td>Standard deduction (${TAX_DATA.tax_year})</td><td class="r">${money(TAX_DATA.standard_deduction)}</td></tr>
+      <tr><td>State and local tax paid</td><td class="r">${money(it.stateTax)}</td></tr>
+      <tr><td>Charitable giving</td><td class="r">${money(it.charity)}</td></tr>
+      <tr><td>Deductible medical</td><td class="r">${money(it.medical)}</td></tr>
+      <tr><td><b>Itemized total</b></td><td class="r"><b>${money(it.total)}</b></td></tr>
+    </tbody></table>
+    <div class="row"><button class="btn" id="std">Take the standard deduction</button>
+      <button class="btn" id="itm">Itemize</button></div>`,()=>{
+    $("#cx").onclick=()=>{closePanel();render();};
+    const go=useIt=>{ const dead=fileTaxes(useIt); closePanel(); render(); if(dead||S.over) showEnd(); };
+    $("#std").onclick=()=>go(false); $("#itm").onclick=()=>go(true);
+  });
+}
+
+/* ---------- terminal: investing ---------- */
+function openTerminal(){
+  const held=COMPANIES.filter(([t])=>(S.stocks[t]||0)>0.0001);
+  const stockVal=COMPANIES.reduce((a,[t])=>a+(S.stocks[t]||0)*S.prices[t],0);
+  openPanel(`<div class="phead"><div><h3>Terminal</h3>
+    <p class="sub">Fifteen names, one index fund, one bond fund, one savings account.</p></div>
+    <button class="x" id="cx">×</button></div><div class="hr"></div>
+    <table><tbody>
+      <tr><td>Cash</td><td class="r pos">${money(S.cash)}</td></tr>
+      <tr><td>Savings (${(TUNING.savings_apy*100).toFixed(1)}% a year)</td><td class="r pos">${money(S.savings)}</td></tr>
+      <tr><td>Index fund</td><td class="r pos">${money(S.index*S.prices.INDEX)}</td></tr>
+      <tr><td>Bond fund</td><td class="r pos">${money(S.bonds*S.prices.BOND)}</td></tr>
+      <tr><td>Individual stocks</td><td class="r pos">${money(stockVal)}</td></tr>
+      <tr><td>Retirement</td><td class="r pos">${money(S.retirement)}</td></tr>
+      <tr><td><b>Net worth</b></td><td class="r"><b class="pos">${money(netWorth())}</b></td></tr>
+    </tbody></table>
+    <div class="hr"></div>
+    <div class="row" style="margin-top:0">
+      <select id="inst" style="flex:2 1 210px">
+        <option value="SAVINGS">Savings account</option>
+        <option value="INDEX">Index fund — ${money(S.prices.INDEX)}</option>
+        <option value="BOND">Bond fund — ${money(S.prices.BOND)}</option>
+        ${COMPANIES.map(([t,n,s])=>`<option value="${t}">${n} (${t}) — $${S.prices[t].toFixed(2)}</option>`).join("")}
+      </select>
+      <input type="number" id="amt" placeholder="Amount in dollars" style="flex:1 1 130px" min="0" step="50">
+      <button class="btn go sm" id="buy">Buy</button>
+      <button class="btn warn sm" id="sell">Sell</button>
+    </div>
+    ${held.length?`<div class="hr"></div><table><thead><tr><th>Holding</th><th class="r">Price</th><th class="r">Value</th></tr></thead>
+      <tbody>${held.map(([t,n])=>`<tr><td>${n}</td><td class="r">$${S.prices[t].toFixed(2)}</td>
+        <td class="r pos">${money(S.stocks[t]*S.prices[t])}</td></tr>`).join("")}</tbody></table>`:""}
+    <div class="note">Every trade costs ${(MARKET_TUNE.spread*100).toFixed(1)}% in spread. Over thirty turns that adds up more than it looks like it should.</div>
+    <div class="row"><button class="btn go" id="done">Done</button></div>`,()=>{
+    $("#cx").onclick=$("#done").onclick=()=>{closePanel();render();};
+    const trade=dir=>{
+      const inst=$("#inst").value, amt=Math.max(0,+$("#amt").value||0);
+      if(!amt) return;
+      const price=inst==="SAVINGS"?1:S.prices[inst];
+      if(dir>0){
+        if(S.cash<amt){ toast("Not enough cash."); return; }
+        S.cash-=amt; const net=inst==="SAVINGS"?amt:amt*(1-MARKET_TUNE.spread);
+        if(inst==="SAVINGS") S.savings+=net; else if(inst==="INDEX") S.index+=net/price;
+        else if(inst==="BOND") S.bonds+=net/price; else S.stocks[inst]=(S.stocks[inst]||0)+net/price;
+        S.investedTotal+=amt;
+      } else {
+        const have=inst==="SAVINGS"?S.savings:inst==="INDEX"?S.index*price:inst==="BOND"?S.bonds*price:(S.stocks[inst]||0)*price;
+        const v=Math.min(have,amt); if(v<=0){ toast("You don't hold that."); return; }
+        if(inst==="SAVINGS") S.savings-=v; else if(inst==="INDEX") S.index-=v/price;
+        else if(inst==="BOND") S.bonds-=v/price; else S.stocks[inst]-=v/price;
+        S.cash+=inst==="SAVINGS"?v:v*(1-MARKET_TUNE.spread);
+      }
+      openTerminal(); render();
+    };
+    $("#buy").onclick=()=>trade(1); $("#sell").onclick=()=>trade(-1);
+  });
+}
+
+/* ---------- bookkeeping month: same ledger, user-entered numbers ---------- */
+function resolveBookMonth(report){
+  const take=S.bookIncome||0; report.gross+=take; report.take+=take;
+  let pool=take; const wanted=S.categories.reduce((a,c)=>a+c.alloc,0);
+  if(wanted>pool){ const k=pool>0?pool/wanted:0; S.categories.forEach(c=>c.jar+=c.alloc*k); pool=0; report.overAllocated=true; }
+  else { S.categories.forEach(c=>c.jar+=c.alloc); pool-=wanted; }
+  S.cash+=pool;
+  for(const c of S.categories){
+    const req=c.actualInput||0; let paid=0;
+    const fj=Math.min(c.jar,req); c.jar-=fj; paid+=fj;
+    if(paid<req){ const fc=Math.min(S.cash,req-paid); S.cash-=fc; paid+=fc; }
+    S.ledger.push({date:`${S.year}-${String(S.month+1).padStart(2,"0")}`,category:c.name,
+      planned:Math.round(c.alloc),actual:Math.round(paid),rollover_rule:c.rule});
+    report.rows[c.id]={name:c.name,planned:c.alloc,actual:paid,req,jar:c.jar};
+    if(c.rule==="sweep"&&c.jar>0){ S.cash+=c.jar; c.jar=0; }
+  }
+  S.monthsLived++; S.month++; if(S.month>11){S.month=0;S.year++;}
+  return null;
+}
+
+/* ---------- the monthly report ---------- */
+function showReport(rep){
+  const rows=Object.values(rep.rows);
+  const newLines=S.log.slice(0,Math.max(0,S.log.length-rep.events));
+  openPanel(`<div class="phead"><div><h3>${rep.from} → ${rep.to}</h3>
+    <p class="sub">${rep.months} month${rep.months>1?"s":""} resolved.</p></div>
+    <button class="x" id="cx">×</button></div><div class="hr"></div>
+    <table><thead><tr><th>Category</th><th class="r">Allocated</th><th class="r">Spent</th><th class="r">Rolled over</th></tr></thead>
+    <tbody>${rows.map(r=>{ const c=S.categories.find(c=>c.name===r.name);
+      return `<tr><td>${esc(r.name)}</td><td class="r">${money(r.planned)}</td>
+      <td class="r ${r.actual>r.planned?"neg":""}">${money(r.actual)}</td>
+      <td class="r pos">${money(c?c.jar:0)}</td></tr>`;}).join("")}
+      <tr><td><b>Take-home</b></td><td class="r"></td><td class="r"><b>${money(rep.take)}</b></td>
+      <td class="r pos"><b>${money(S.cash)} in cash</b></td></tr>
+    </tbody></table>
+    ${rep.leak>1?`<div class="note">Unbudgeted spending: <span class="money" style="color:var(--rust)">${money(rep.leak)}</span>.
+      Money you didn't give a job to went somewhere and you don't remember where.</div>`:""}
+    ${rep.overAllocated?`<div class="note" style="border-color:var(--rust)">You allocated more than you earn. Every jar filled short, proportionally.</div>`:""}
+    ${rep.match?`<div class="note">Employer put in <span class="money">${money(rep.match)}</span>. That is the highest-return money in the game.</div>`:""}
+    ${newLines.length?`<div class="hr"></div>${newLines.map(l=>`<p class="${l.cls==="big"?"":""}" style="border-left:3px solid ${l.cls==="big"?"var(--red)":l.cls==="bad"?"var(--rust)":"var(--board-lt)"};padding-left:10px;margin:0 0 8px">${esc(l.t)}</p>`).join("")}`:""}
+    <div class="row"><button class="btn go" id="done">Back to the house</button></div>`,()=>{
+    $("#cx").onclick=$("#done").onclick=()=>{closePanel();render();};
+  });
+}
+
+/* ---------- end of run ---------- */
+async function showEnd(){
+  lockPanel=false; closePanel();
+  const s=scoreRun(), e=S.ending||ENDINGS.old_age, win=S.over==="old_age";
+  const stockVal=COMPANIES.reduce((a,[t])=>a+(S.stocks[t]||0)*S.prices[t],0);
+  openPanel(`<div class="phead"><div><h3 style="color:${win?"var(--money)":"var(--red)"}">${e.title}</h3>
+    <p class="sub">${e.line}</p></div></div><div class="hr"></div>
+    <table><tbody>
+      <tr><td>Years lived in the run</td><td class="r">${s.years.toFixed(1)}</td></tr>
+      <tr><td>Net worth</td><td class="r pos">${money(s.nw)}</td></tr>
+      <tr><td>Average mood</td><td class="r">${Math.round(s.avgHappy)} / 100</td></tr>
+      <tr><td>Index fund</td><td class="r">${money(S.index*S.prices.INDEX)}</td></tr>
+      <tr><td>Stock picks</td><td class="r">${money(stockVal)}</td></tr>
+      <tr><td>Retirement</td><td class="r">${money(S.retirement)}</td></tr>
+      <tr><td><b>Score — net worth weighted by how you lived</b></td><td class="r"><b class="pos">${money(s.total)}</b></td></tr>
+    </tbody></table>
+    <div class="hr"></div>
+    <div id="pm"><p class="sub">Writing up the run…</p></div>
+    <div class="row"><button class="btn go" id="again">New run</button>
+      <button class="btn ghost" id="dl">Download this run</button>
+      <button class="btn ghost" id="csv">Export CSV</button></div>`,()=>{
+    lockPanel=true;
+    $("#again").onclick=()=>{ lockPanel=false; localStorage.removeItem(KEY); S=null; closePanel(); titleScreen(); };
+    $("#dl").onclick=()=>download("xpenses-run.json",JSON.stringify(S,null,1));
+    $("#csv").onclick=exportCSV;
+  });
+  const [summary,roast]=await postMortem();
+  const pm=$("#pm"); if(pm) pm.innerHTML=`<p>${esc(summary)}</p>
+    <div class="note" style="border-color:var(--money)">${esc(roast)}</div>`;
+}
+
+/* ---------- title ---------- */
+function titleScreen(){
+  const hasSave=!!localStorage.getItem(KEY);
+  app.innerHTML=`<div class="title">
+    <h1>Nobody taught you<br>how to <em>run a month</em>.</h1>
+    <p>Take a job, get paid, hand the money to categories you choose yourself, and push
+    time forward. Rent is due whether or not you budgeted for it. The shocks are coming
+    and they don't announce the date. Getting old is how you win.</p>
+    <div class="modepick">
+      <button class="modecard" id="mlearn"><b>Learn</b>
+        <span>The game. Accelerating clock, shocks, health and mood, a run that ends.</span></button>
+      <button class="modecard" id="mbook"><b>Bookkeeping</b>
+        <span>Your real numbers. One month at a time, no shocks, no score. Stays in your browser.</span></button>
+    </div>
+    <div class="row">
+      ${hasSave?`<button class="btn ghost" id="cont">Continue last run</button>`:""}
+      <label class="btn ghost" style="display:inline-block">Load a save file
+        <input type="file" id="lf" accept="application/json" style="display:none"></label>
+    </div>
+    <p class="hint" style="margin-top:18px">Nothing you type leaves this browser. Saves live in localStorage
+    and in files you download — clearing site data clears them, so download anything you want to keep.</p>
+  </div>`;
+  $("#mlearn").onclick=setupRun;
+  $("#mbook").onclick=()=>{ newGame("book",{}); S.bookIncome=0; openBookSetup(); };
+  if($("#cont")) $("#cont").onclick=()=>{ if(loadLocal()){ render(); if(S.over) showEnd(); } else toast("No save found."); };
+  $("#lf").onchange=e=>{ if(e.target.files[0]) importFile(e.target.files[0],ok=>ok?render():toast("That file didn't load.")); };
+}
+function setupRun(){
+  let job="office", house=0;
+  const draw=()=>openPanel(`<div class="phead"><div><h3>Pick a life</h3>
+    <p class="sub">These change which stat is under pressure, not just the number on the cheque.</p></div></div>
+    <div class="hr"></div>
+    <label class="f">Job</label>
+    <div class="tiers">${Object.entries(TUNING.jobs).map(([k,j])=>`<button class="tier" aria-pressed="${k===job}" data-j="${k}">
+      <b>${j.name}</b><small>${money(j.wage)}/mo · ${j.hours}h · ${j.note}</small></button>`).join("")}</div>
+    <label class="f">Where you live</label>
+    <div class="tiers">${TUNING.housing.map((h,i)=>`<button class="tier" aria-pressed="${i===house}" data-h="${i}">
+      <b>${h.name}</b><small>${money(h.rent)} / month</small></button>`).join("")}</div>
+    <div class="note">You start with ${money(TUNING.start_cash)} and five categories. Add your own —
+      the thing that ends most runs is a category nobody thought to create.</div>
+    <div class="row"><button class="btn go" id="start">Start the run</button></div>`,()=>{
+    panel.querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>{job=b.dataset.j;draw();});
+    panel.querySelectorAll("[data-h]").forEach(b=>b.onclick=()=>{house=+b.dataset.h;draw();});
+    $("#start").onclick=()=>{ newGame("learn",{job,housing:house}); closePanel(); render(); };
+  });
+  draw();
+}
+function openBookSetup(){
+  openPanel(`<div class="phead"><div><h3>Your numbers</h3>
+    <p class="sub">Take-home pay per month. Everything else you'll enter as you go.</p></div></div>
+    <div class="hr"></div>
+    <label class="f">Monthly take-home</label><input type="number" id="inc" min="0" step="50" value="0">
+    <div class="note">This stays on your machine. Nothing is sent anywhere, and the only copies are
+      localStorage and files you download.</div>
+    <div class="row"><button class="btn go" id="ok">Start the ledger</button></div>`,()=>{
+    $("#ok").onclick=()=>{ S.bookIncome=Math.max(0,+$("#inc").value||0); closePanel(); render(); };
+  });
+}
+
+/* ---------- boot ---------- */
+titleScreen();
+</script>
+</body>
+</html>
