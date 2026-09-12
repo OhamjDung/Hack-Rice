@@ -1,8 +1,15 @@
-/* Renders a price-history line into an <svg> plus buy/sell trade markers. */
-const CHART_W = 900, CHART_H = 400, CHART_PAD = 16;
+/* Renders a price-history line into an <svg> plus buy/sell trade markers.
+   Reads the target <svg>'s own viewBox for its drawing size rather than
+   assuming one, so it works at whatever aspect ratio a caller sets — a
+   mismatch here previously clipped the line off the bottom of any chart
+   shorter than the hardcoded 400 (the stock cards use a 900x300 viewBox). */
+const CHART_W_DEFAULT = 900, CHART_H_DEFAULT = 400, CHART_PAD = 16;
 
 function renderChart(svg, history, trades) {
   if (!history || history.length < 2) { svg.innerHTML = ''; return; }
+  const vb = svg.viewBox && svg.viewBox.baseVal;
+  const CHART_W = (vb && vb.width) || CHART_W_DEFAULT;
+  const CHART_H = (vb && vb.height) || CHART_H_DEFAULT;
   const prices = history.map(h => h.price);
   const min = Math.min(...prices), max = Math.max(...prices);
   const span = Math.max(0.01, max - min);
