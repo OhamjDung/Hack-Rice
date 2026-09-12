@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Grapefruit Trading Online</title>
+<style>
+  :root{
+    --bg:#0b0b0c; --panel:#141416; --panel2:#1a1a1d; --border:#2a2a2e;
+    --green:#3ddc5a; --yellow:#f5e642; --red:#e5473f; --muted:#8a8a90; --text:#e9e9ec;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:#3a3a3e;font-family:"Segoe UI",Arial,sans-serif;}
+  .browser{
+    max-width:1200px;margin:24px auto;border-radius:10px;overflow:hidden;
+    box-shadow:0 30px 60px rgba(0,0,0,.5);border:1px solid #050505;
+  }
+  .chrome{
+    background:linear-gradient(#3b3b3e,#2c2c2f);display:flex;align-items:center;gap:14px;
+    padding:10px 16px;border-bottom:1px solid #1c1c1e;
+  }
+  .chrome .dots{display:flex;gap:8px;color:#cfcfd2;}
+  .chrome .dots span{font-size:16px;}
+  .chrome .urlbar{
+    flex:1;background:#1c1c1e;border:1px solid #0a0a0a;border-radius:16px;
+    color:#c9c9cc;font-size:13px;padding:7px 14px;display:flex;align-items:center;gap:8px;
+  }
+  .chrome .urlbar svg{flex:none;}
+  .chrome .kebab{color:#cfcfd2;font-size:18px;}
+
+  .app{background:var(--bg);color:var(--text);padding:22px 26px 0;}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .logo{width:38px;height:38px;background:#232326;border:1px solid #3a3a3e;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;font-size:20px;color:#9a9a9e;}
+  .brand h1{margin:0;font-size:26px;font-weight:700;color:#c7c7cb;letter-spacing:.3px;}
+  .brand h1 sup{font-size:11px;color:#7a7a7e;}
+  .brand h1 .accent{color:#8f8f93;font-weight:400;}
+  .signed{text-align:right;font-size:12px;color:var(--muted);line-height:1.5;}
+  .signed b{color:#d8d8db;font-weight:600;}
+
+  .grid{display:grid;grid-template-columns:1fr 310px;gap:20px;}
+  .main{border-right:1px solid var(--border);padding-right:0;min-width:0;}
+
+  .holdings{display:flex;align-items:center;gap:40px;padding-bottom:16px;margin-bottom:6px;}
+  .holdings h2{grid-column:1/-1;font-size:18px;font-weight:600;color:#d3d3d6;margin:0 0 14px;}
+  .stat .value{font-size:30px;font-weight:800;}
+  .stat .label{font-size:12px;letter-spacing:.5px;color:var(--muted);font-style:italic;margin-top:2px;}
+  .stat.cash .value{color:var(--green);}
+  .stat.coin .value{color:var(--yellow);text-align:center;}
+  .stat.coin{text-align:center;}
+  .stat.status{margin-left:auto;text-align:right;}
+  .stat.status .tag{color:var(--muted);font-size:11px;}
+  .stat.status .out{color:var(--red);font-weight:800;font-size:15px;}
+  .stat.status .in{color:var(--green);font-weight:800;font-size:15px;}
+
+  .chartwrap{
+    position:relative;border-top:1px solid var(--border);background:
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.035) 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,.035) 39px 40px),
+      #0a0a0b;
+    height:420px;
+  }
+  .price-badge{
+    position:absolute;font-weight:700;font-size:22px;color:#fff;
+    background:transparent;pointer-events:none;transform:translate(8px,-28px);
+    text-shadow:0 0 6px rgba(0,0,0,.8);
+  }
+  .ticker-strip{
+    display:flex;gap:26px;overflow:hidden;white-space:nowrap;border-top:1px solid var(--border);
+    padding:10px 0;font-size:13px;color:var(--yellow);font-family:Consolas,monospace;
+    mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);
+    width:100%;min-width:0;
+  }
+  .ticker-strip .item{display:flex;gap:6px;align-items:center;flex:none;}
+  .ticker-strip .up{color:var(--green);}
+  .ticker-strip .track{display:flex;gap:26px;animation:scroll 18s linear infinite;}
+  @keyframes scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+  /* news panel */
+  .news{padding-left:0;}
+  .news h2{font-size:19px;font-weight:600;color:#d3d3d6;margin:0 0 14px;}
+  .card{
+    background:var(--panel);border:1px solid var(--border);border-radius:6px;
+    padding:10px 12px;margin-bottom:10px;cursor:default;
+  }
+  .card .tag{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;}
+  .tag.buzz,.tag.moves,.tag.bull{color:var(--green);}
+  .tag.rumor,.tag.dip{color:var(--red);}
+  .card h3{margin:3px 0 4px;font-size:15px;font-weight:700;color:#f0f0f2;}
+  .card p{margin:0;font-size:12px;color:#9d9da2;line-height:1.4;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .actions h2{font-size:19px;font-weight:600;color:#d3d3d6;margin:26px 0 14px;}
+  .buyall{
+    width:100%;position:relative;border:none;border-radius:8px;
+    background:linear-gradient(#ffe94d,#f4d70e);color:#1c1c00;
+    font-size:30px;font-weight:900;letter-spacing:.5px;padding:22px 0;cursor:pointer;
+    box-shadow:0 6px 0 #a3910a,0 10px 18px rgba(0,0,0,.4);
+    transition:transform .05s ease;
+  }
+  .buyall:active{transform:translateY(4px);box-shadow:0 2px 0 #a3910a;}
+  .buyall .key{
+    position:absolute;right:14px;bottom:10px;background:#0b0b0c;color:#eee;
+    font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid #3a3a3e;
+  }
+  .flash{position:absolute;inset:0;pointer-events:none;background:rgba(61,220,90,0);transition:background .25s;}
+
+  footer.spacer{height:22px;}
+
+  @media (max-width:860px){
+    .grid{grid-template-columns:1fr;}
+    .main{border-right:none;}
+    .news{border-top:1px solid var(--border);padding-top:18px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="browser">
+  <div class="chrome">
+    <span class="dots">&#8592;&nbsp;&nbsp;&#8594;&nbsp;&nbsp;&#8635;</span>
+    <div class="urlbar">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8a8a8e" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      www.grapefruittrading.rbx/dashboard
+    </div>
+    <span class="kebab">&#8942;</span>
+  </div>
+
+  <div class="app">
+    <div class="top">
+      <div class="brand">
+        <div class="logo">&#127818;</div>
+        <h1>Grapefruit Trading<sup>™</sup> <span class="accent">Online<sup>™</sup></span></h1>
+      </div>
+      <div class="signed">signed in<br/><b>@ViewYT</b></div>
+    </div>
+
+    <div class="grid">
+      <div class="main">
+        <div class="holdings">
+          <div class="stat cash">
+            <div class="value" id="cashValue">$31.933 duoquadragintillion</div>
+            <div class="label">CASH</div>
+          </div>
+          <div class="stat coin">
+            <div class="value" id="coinValue">0.00</div>
+            <div class="label">GrapefruitCoin</div>
+          </div>
+          <div class="stat status">
+            <div class="tag">you are</div>
+            <div class="out" id="posStatus">OUT</div>
+          </div>
+        </div>
+
+        <div class="chartwrap">
+          <svg id="chartSvg" width="100%" height="100%" viewBox="0 0 900 400" preserveAspectRatio="none"></svg>
+          <div class="price-badge" id="priceBadge">$151.43</div>
+        </div>
+
+        <div class="ticker-strip">
+          <div class="track" id="tickerTrack"></div>
+        </div>
+      </div>
+
+      <div class="news">
+        <h2>Latest News</h2>
+        <div id="newsList"></div>
+
+        <h2>Account Actions</h2>
+        <button class="buyall" id="buyAllBtn">
+          <span class="flash" id="buyFlash"></span>
+          BUY ALL
+          <span class="key">SPACE</span>
+        </button>
+      </div>
+    </div>
+    <footer class="spacer"></footer>
+  </div>
+</div>
+
+<script>
+/* ---------- mock data ---------- */
+const NEWS = [
+  {tag:'LOCAL BUZZ',   cls:'buzz',  title:'Blog likes GrapefruitCoin', body:'A small trading blog praised GrapefruitCoin as a surprisingly fun shoestring pick with real upside.'},
+  {tag:'NEW RUMOR',    cls:'rumor', title:'Founder naps',              body:"A rumor spread that GrapefruitCoin's founder was asleep during market hours again."},
+  {tag:'SMALL DIP',    cls:'dip',   title:'Ticker typo fail',          body:'A popular chart site briefly misspelled GrapefruitCoin, and traders sold the confusion.'},
+  {tag:'MONEY MOVES',  cls:'moves', title:'Fund opens position',       body:'A small crypto fund disclosed a new GrapefruitCoin position after weeks of silence.'},
+  {tag:'BULLISH CALL', cls:'bull',  title:'Analysts turn bullish',     body:'Several market watchers upgraded GrapefruitCoin from suspicious to cautiously promising.'}
+];
+
+const newsList = document.getElementById('newsList');
+NEWS.forEach(n=>{
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `<div class="tag ${n.cls}">${n.tag}</div><h3>${n.title}</h3><p>${n.body}</p>`;
+  newsList.appendChild(el);
+});
+
+/* ---------- ticker tape (mock, duplicated for seamless scroll) ---------- */
+const tapeItems = ['GRP 5k @ 89.2', 'MLN 2k @ 14.7', 'ZKC 800 @ 340.1', 'BRY 12k @ 4.03', 'FRT 3k @ 61.9'];
+const track = document.getElementById('tickerTrack');
+function buildTape(){
+  let html = '';
+  for(let rep=0; rep<2; rep++){
+    tapeItems.forEach(t=>{
+      const up = Math.random() > 0.4;
+      html += `<span class="item">${t.split(' ')[0]} ${t.split(' ').slice(1).join(' ')}
+        <span class="${up?'up':''}">${up?'&#9650;':'&#9660;'} ${(Math.random()*5).toFixed(2)}</span></span>`;
+    });
+  }
+  track.innerHTML = html;
+}
+buildTape();
+
+/* ---------- live-ish price chart (mock random walk) ---------- */
+const svg = document.getElementById('chartSvg');
+const badge = document.getElementById('priceBadge');
+const N = 60;
+let price = 380;
+let series = [];
+for(let i=0;i<N;i++){
+  price += (Math.random()-0.62) * 14; // trending down to start, like the screenshot
+  price = Math.max(20, price);
+  series.push(price);
+}
+
+const W = 900, H = 400, PAD = 10;
+function render(){
+  const min = Math.min(...series), max = Math.max(...series);
+  const span = Math.max(1, max - min);
+  const pts = series.map((v,i)=>{
+    const x = PAD + (i/(N-1)) * (W-PAD*2);
+    const y = H - PAD - ((v-min)/span) * (H-PAD*2);
+    return [x,y];
+  });
+  const d = pts.map((p,i)=> (i===0?'M':'L') + p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+
+  const last = pts[pts.length-1];
+  svg.innerHTML = `
+    <line x1="0" y1="${last[1].toFixed(1)}" x2="${W}" y2="${last[1].toFixed(1)}" stroke="#3a3a3e" stroke-width="1"/>
+    <path d="${d}" fill="none" stroke="#f5e642" stroke-width="2.5"/>
+  `;
+  badge.style.left = last[0] + 'px';
+  badge.style.top  = last[1] + 'px';
+  const cur = series[series.length-1];
+  badge.textContent = '$' + cur.toFixed(2);
+  badge.style.color = cur >= series[series.length-2] ? '#3ddc5a' : '#f5e642';
+}
+render();
+
+setInterval(()=>{
+  const last = series[series.length-1];
+  let next = last + (Math.random()-0.5) * 16;
+  next = Math.max(15, next);
+  series.push(next);
+  if(series.length > N) series.shift();
+  render();
+}, 900);
+
+setInterval(buildTape, 4000);
+
+/* ---------- buy all ---------- */
+let coins = 0, cash = 31.933;
+const coinValue = document.getElementById('coinValue');
+const posStatus = document.getElementById('posStatus');
+const flash = document.getElementById('buyFlash');
+
+function buyAll(){
+  const price = series[series.length-1];
+  const bought = (cash * 1000) / price; // mock conversion, numbers are flavor only
+  coins += bought;
+  coinValue.textContent = coins.toFixed(2);
+  posStatus.textContent = 'IN';
+  posStatus.className = 'in';
+  flash.style.background = 'rgba(61,220,90,.35)';
+  setTimeout(()=> flash.style.background = 'rgba(61,220,90,0)', 200);
+}
+
+document.getElementById('buyAllBtn').addEventListener('click', buyAll);
+window.addEventListener('keydown', e=>{
+  if(e.code === 'Space'){ e.preventDefault(); buyAll(); }
+});
+</script>
+</body>
+</html>

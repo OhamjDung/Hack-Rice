@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Grapefruit Trading — Investing Mode</title>
+<link rel="stylesheet" href="css/investing.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">&#127818;</span>Grapefruit Trading</div>
+  <a class="back" href="index.html">&#8592; Dashboard</a>
+  <div class="spacer"></div>
+  <div class="metric cash"><div class="label">Cash</div><div class="val" id="cashVal">$0.00</div></div>
+  <div class="metric"><div class="label">Portfolio</div><div class="val" id="portfolioVal">$0.00</div></div>
+  <div class="metric timer" id="timerMetric"><div class="label">Time left</div><div class="val" id="timerVal">--:--</div></div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="browse">
+    <div class="ticker-banner empty" id="tickerBanner">
+      <span class="badge">BREAKING</span>
+      <span class="headline" id="tickerHeadline">Waiting on the wire for the first headline…</span>
+    </div>
+
+    <div class="panels">
+      <div>
+        <div class="portfolio-card">
+          <h2>Your Portfolio</h2>
+          <div class="portfolio-stats">
+            <div class="item"><div class="label">Starting cash</div><div class="val" id="statStart">$0</div></div>
+            <div class="item"><div class="label">Total value</div><div class="val" id="statTotal">$0</div></div>
+            <div class="item"><div class="label">Gain / Loss</div><div class="val" id="statGain">$0</div></div>
+          </div>
+          <table class="holdings-table" id="holdingsTable">
+            <thead><tr><th>Ticker</th><th>Shares</th><th>Price</th><th>Value</th></tr></thead>
+            <tbody id="holdingsBody"></tbody>
+          </table>
+          <div class="holdings-empty" id="holdingsEmpty">No positions yet — pick something on the left to start trading.</div>
+        </div>
+      </div>
+
+      <div class="news-feed">
+        <h2>Latest News</h2>
+        <div id="newsList"><div class="news-empty">Headlines will appear here as the market moves.</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- fullscreen stock/ETF detail -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-top">
+    <button class="exit-btn" id="exitDetailBtn">&#8592; Exit</button>
+    <div class="who"><div class="tk" id="detailTicker">—</div><h2 id="detailName">—</h2></div>
+    <div class="price-now"><div class="p" id="detailPrice">$0.00</div><div class="c" id="detailChange">+0.00%</div></div>
+  </div>
+  <div class="detail-body">
+    <div class="chart-wrap"><svg id="detailChart" viewBox="0 0 900 400" preserveAspectRatio="none"></svg></div>
+    <div class="trade-panel">
+      <div class="locked-banner" id="lockedBanner" style="display:none;">Session ended — trading is locked.</div>
+      <h3>Position</h3>
+      <div class="owned" id="ownedLine">0 shares owned</div>
+      <h3>Trade</h3>
+      <div class="qty-row">
+        <button type="button" id="qtyMinus">−</button>
+        <input type="number" id="qtyInput" value="1" min="1" step="1"/>
+        <button type="button" id="qtyPlus">+</button>
+        <button type="button" id="qtyMax">MAX</button>
+      </div>
+      <div class="trade-buttons">
+        <button class="buy-btn" id="buyBtn">BUY</button>
+        <button class="sell-btn" id="sellBtn">SELL</button>
+      </div>
+      <div class="trade-msg" id="tradeMsg"></div>
+      <h3>Recent trades</h3>
+      <ul class="trade-log" id="tradeLog"><li style="color:#666;">No trades yet</li></ul>
+    </div>
+  </div>
+  <div class="mini-ticker" id="miniTicker">BREAKING: waiting on the wire…</div>
+</div>
+
+<!-- end-of-session summary -->
+<div class="modal-backdrop" id="summaryBackdrop">
+  <div class="summary-card">
+    <h2 id="summaryTitle">Session complete</h2>
+    <div class="sub" id="summarySub">Here's how your run played out.</div>
+    <div id="recordBadgeWrap"></div>
+    <div class="summary-grid">
+      <div class="item"><div class="label">Final value</div><div class="val" id="sumFinal">$0</div></div>
+      <div class="item"><div class="label">Gain / Loss</div><div class="val" id="sumGain">$0</div></div>
+      <div class="item"><div class="label">Personal best</div><div class="val" id="sumBest">$0</div></div>
+      <div class="item"><div class="label">Improvement</div><div class="val" id="sumImprove">0%</div></div>
+    </div>
+    <div class="reward-line" id="sumRewardLine">Reward: <strong id="sumReward">0</strong> coins</div>
+    <div class="summary-actions">
+      <button class="close-btn" id="summaryCloseBtn">Close</button>
+      <button class="play-again" id="playAgainBtn">Play again</button>
+    </div>
+  </div>
+</div>
+
+<script src="data/companies.js"></script>
+<script src="data/events.js"></script>
+<script src="js/rewards.js"></script>
+<script src="js/chart.js"></script>
+<script src="js/scheduler.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
