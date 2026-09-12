@@ -1,5 +1,7 @@
 export const TILE_WIDTH = 48, TILE_HEIGHT = 24, GRID_SIZE = 12;
-export const OBJECTS = [{ id: 'food', label: 'Refrigerator', x: 2, y: 2, w: 1.2, d: 1.2 }, { id: 'utilities', label: 'Kitchen & utilities', x: 0, y: 3, w: 1.2, d: 2.4 }, { id: 'housing', label: 'Bed & rent', x: 2, y: 8, w: 2.6, d: 3 }, { id: 'leisure', label: 'Sofa & downtime', x: 8, y: 7, w: 2.8, d: 1.4 }, { id: 'savings', label: 'Savings ledger', x: 6, y: 6, w: 1.4, d: 1 }, { id: 'transit', label: 'Car keys', x: 6, y: 11, w: 1, d: .5 }, { id: 'desk', label: 'Work desk', x: 9, y: 1, w: 2, d: 1.4 }] as const;
+// Extra drawing space contains every wall and floor corner at 150% zoom.
+export const ROOM_VIEW={width:1280,height:960,maxZoom:1.5} as const;
+export const OBJECTS = [{ id: 'food', label: 'Refrigerator', x: 0, y: 1.4, w: 1.2, d: 1.2 }, { id: 'utilities', label: 'Kitchen & utilities', x: 0, y: 3, w: 1.2, d: 2.4 }, { id: 'housing', label: 'Bed & rent', x: 9, y: 1, w: 2.6, d: 3 }, { id: 'leisure', label: 'Sofa & downtime', x: 6.5, y: 7, w: 2.8, d: 1.4 }, { id: 'savings', label: 'Savings ledger', x: 6.9, y: 9.6, w: 1.4, d: 1 }, { id: 'transit', label: 'Car keys', x: 6, y: 11, w: 1, d: .5 }, { id: 'desk', label: 'Work desk', x: 1, y: 7, w: 2, d: 1.4 }] as const;
 export function gridToScreen(x: number, y: number, ox = 360, oy = 140) { return { screenX: ox + (x - y) * TILE_WIDTH / 2, screenY: oy + (x + y) * TILE_HEIGHT / 2 }; }
 export function rotateGrid(x:number,y:number,angle:number){const c=Math.cos(angle),s=Math.sin(angle);return {x:6+(x-6)*c-(y-6)*s,y:6+(x-6)*s+(y-6)*c};}
 export function projectRoom(x:number,y:number,angle:number){const p=rotateGrid(x,y,angle);return gridToScreen(p.x,p.y);}

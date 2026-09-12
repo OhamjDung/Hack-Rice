@@ -7,7 +7,7 @@ export const MISSIONS=[{id:'saving',title:'Future-you fund',detail:'Transfer $15
 export const SHOP=[{id:'plant',name:'A leafy roommate',cost:30,description:'A new plant for your room.'},{id:'lamp',name:'Reading lamp',cost:45,description:'A little light beside your bed.'},{id:'rug',name:'A softer landing',cost:60,description:'Replace the rug with a warm woven one.'},{id:'bookshelf',name:'Bookshelf',cost:80,description:'Make room for your next chapter.'},{id:'house',name:'Upgrade the apartment',cost:120,description:'A new wall finish and a higher home level.'}] as const;
 export function missionProgress(s:GameState,id:typeof MISSIONS[number]['id']){
  const month=Math.floor((s.metrics.turn-1)/30);
- return s.transactions.filter(t=>t.origin==='nessie'&&Math.floor(((t.gameDay||1)-1)/30)===month&&t.purpose===id).reduce((n,t)=>n+t.amount,0);
+ return s.transactions.filter(t=>(t.origin==='nessie'||t.origin==='mock')&&Math.floor(((t.gameDay||1)-1)/30)===month&&t.purpose===id).reduce((n,t)=>n+t.amount,0);
 }
 export function appendDialogue(s:GameState,message:string,kind:'action'|'warning'|'reward'|'ending'|'info'='action',id?:string):GameState{
  if(!message||s.dialogue.some(d=>id?d.id===id:d.day===s.metrics.turn&&d.message===message))return s;

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>RoomEconomy — a home built one coin at a time</title>
+  <path d="M8 0h48v4h4v4h4v48h-4v4h-4v4H8v-4H4v-4H0V8h4V4h4Z" fill="#344238"/>
+  <path d="M8 28h8v-8h8v-8h16v8h8v8h8v8H8Z" fill="#e9e8d4"/>
+  <path d="M12 36h40v20H12Z" fill="#a8b68d"/>
+  <path d="M20 36h12v12H20Z" fill="#344238"/>
+  <path d="M24 36h4v12h-4Z" fill="#e9e8d4"/>
+  <path d="M20 40h12v4H20Z" fill="#e9e8d4"/>
+  <path d="M38 36h16v4h4v16h-4v4H38v-4h-4V40h4Z" fill="#344238"/>
+  <path d="M40 38h12v4h4v12h-4v4H40v-4h-4V42h4Z" fill="#e6c36d"/>
+  <path d="M44 42h4v12h-4Z" fill="#90713c"/>
+  <path d="M40 42h4v4h-4Z" fill="#fff0bb"/>
+</svg>
