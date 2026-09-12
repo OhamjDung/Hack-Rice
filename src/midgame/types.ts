@@ -1,57 +1,150 @@
-export type DebuffId = 'hungry' | 'unhappy';
+// --- Config ---
+export interface GameConfig {
+  roundDurationMs: number;
+  weekDurationMs: number;
+  weeksPerRound: number;
+  roundsPerYear: number;
 
-export interface Debuff { id: DebuffId; weeksRemaining: number }
+  matchPercent: number;
+  matchCap: number;
 
-export interface Buckets {
-  four01k: number; // total contributed lifetime (display only, doesn't compound here)
-  ira: number;
-  cashReserve: number;
-  invested: number; // medium-tier, compounds slowly each round
+  iraAnnualCap: number;
+
+  emergencyFundMultiplier: number;
+  preUnlockTickMs: number;
+  preUnlockTickAmount: number;
+
+  paycheckBase: number;
+  paycheckVariance: number;
+
+  happinessMax: number;
+  happinessStart: number;
+  happinessDecayPerSecond: number;
+  happinessRefillPerDollar: number;
+  happinessMetThreshold: number;
+
+  foodWeeklyCost: number;
+
+  debuffDuration: number;
+  debuffHappinessHit: number;
+  debuffFoodMaxReduction: number;
+
+  upgradeDecayReductionFloor: number;
+
+  missedBillPenaltyFlat: number;
+
+  microEvent: {
+    spawnIntervalMs: number;
+    reactionWindowMs: number;
+    missedEventPenalty: boolean;
+  };
+
+  sideHustle: {
+    perTapAmount: number;
+    cooldownMs: number;
+    earningsCapPerRound?: number;
+  };
+
+  automationUnlockRound: number;
+  automationEventChance: number;
+
+  investNowStreakForRiskyTier: number;
 }
 
-export interface AutomationState { four01k: boolean; ira: boolean }
+// --- Player / round state ---
+export type DebuffId = 'hungry' | 'unhappy';
+export interface Debuff { id: DebuffId; triggeredBy: 'food' | 'happiness'; weeksRemaining: number }
 
-export interface PendingAllocation {
-  four01k: number;
-  ira: number;
-  cashReserve: number;
-  investNow: number;
+export type AutomationBucket = 'four01k' | 'ira';
+export type AutomationStatus =
+  | { state: 'locked' }
+  | { state: 'manual' }
+  | { state: 'automated' }
+  | { state: 'automated-interrupted'; reason: EventType };
+
+export interface PurchasedUpgrade { id: string; decayReduction: number }
+
+export interface Buckets { four01k: number; ira: number; cashReserve: number; invested: number }
+
+export interface SideHustleState {
+  lastTapAt: number | null;
+  earnedThisRound: number;
+}
+
+export interface PlayerFinancialState {
+  buckets: Buckets;
+  iraAnnualContributed: number;
+  automations: Record<AutomationBucket, AutomationStatus>;
+  matchStreak: number;
+  lastEfficiency: number | null;
+  upgrades: PurchasedUpgrade[];
+  sideHustle: SideHustleState;
+  investNowStreak: number;
+  readyForRiskyTier: boolean;
+  netWorthHistory: number[];
+}
+
+// --- Micro-events (Section 3.5.1) ---
+export type MicroEventKind = 'windfall' | 'discount' | 'happiness_boost' | 'minor_cost';
+export interface MicroEventDefinition {
+  id: string;
+  kind: MicroEventKind;
+  targetNeed?: 'food' | 'happiness';
+  amount: number;
+  weight: number;
+}
+export interface ActiveMicroEvent {
+  id: string;
+  definitionId: string;
+  spawnedAt: number;
+  expiresAt: number;
+  resolved: boolean;
+}
+
+// --- Larger random events + automation interruption ---
+export type EventType = 'bonus' | 'cap_change' | 'early_withdrawal' | 'job_change' | 'car_repair' | 'audit' | 'other';
+export interface GameEvent { type: EventType; round: number; week?: number; payload: Record<string, unknown> }
+
+export type RoundPhase = 'pre-unlock' | 'allocation' | 'weekly-survival' | 'summary';
+
+export interface PendingAllocation { four01k: number; ira: number; cashReserve: number; investNow: number }
+
+export interface RoundState {
+  round: number;
+  year: number;
+  paycheckAmount: number | null;
+  billsAmount: number;
+  phase: RoundPhase;
+  weekIndex: number; // 1..weeksPerRound
+  activeDebuffs: Debuff[];
+  events: GameEvent[];
+  activeMicroEvents: ActiveMicroEvent[];
+  auditOverContribution: number | null; // set when IRA over-cap detected, drives AuditCorrectionModal
+  microEventElapsedMs: number; // time since last spawn, drives the fixed spawn cadence
+  weekElapsedMs: number; // time since the current week began, drives the week boundary
+}
+
+export interface WeekState {
+  happiness: number;
+  happinessDecayPerSec: number;
+  foodMetThisWeek: boolean;
+  foodCostThisWeek: number;
+}
+
+export interface MetaState {
+  unlocked: boolean;
+  monthlyExpenses: number;
+  emergencyFundBalance: number;
+  emergencyFundThreshold: number;
+  isGameOver: boolean;
+  log: string[];
 }
 
 export interface MidgameState {
-  unlocked: boolean;
-  monthlyExpenses: number;
-  emergencyFundBalance: number; // pre-unlock accumulator
-  emergencyFundThreshold: number;
-
-  buckets: Buckets;
-  iraAnnualContributed: number;
-  matchStreak: number;
-  lastEfficiency: number | null;
-
-  round: number;
-  year: number;
-  week: number; // 1..WEEKS_PER_ROUND
-  isRoundActive: boolean; // false while the paycheck-allocation modal is open
-  pendingPaycheck: number | null;
-
-  happiness: number;
-  happinessDecayPerSec: number; // current effective rate (base, upgrades, debuffs applied)
-  foodMetThisWeek: boolean;
-  foodCostThisWeek: number;
-
-  debuffs: Debuff[];
-  upgrades: string[];
-  automations: AutomationState;
-  automationInterrupted: AutomationState; // true = this round's bucket was knocked back to manual
-
-  investNowStreak: number;
-  readyForRiskyTier: boolean;
-
-  netWorthHistory: number[];
-  log: string[];
-
-  isGameOver: boolean;
+  meta: MetaState;
+  player: PlayerFinancialState;
+  round: RoundState;
+  week: WeekState;
 }
 
 export interface RoundSummaryData {

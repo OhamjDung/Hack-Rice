@@ -1,6 +1,6 @@
 import type { RoundSummaryData } from '../types';
 
-export default function RoundSummary({ summary, onContinue }: { summary: RoundSummaryData; onContinue: () => void }) {
+export default function RoundEndSummary({ summary, onContinue }: { summary: RoundSummaryData; onContinue: () => void }) {
   return (
     <dialog open className="mg-modal">
       <h2>Round complete</h2>
