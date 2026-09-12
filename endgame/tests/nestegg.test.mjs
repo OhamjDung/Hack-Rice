@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const FILES = ['data/companies.js', 'data/events.js', 'data/life.js', 'js/finance.js', 'js/market.js', 'js/career-engine.js'];
+const FILES = ['data/real-stocks.js', 'data/life.js', 'js/finance.js', 'js/market.js', 'js/career-engine.js'];
 const root = new URL('../', import.meta.url);
 
 function load({ random } = {}) {
@@ -15,6 +15,8 @@ function load({ random } = {}) {
   if (random) { ctx.__random = random; vm.runInContext('Math.random = () => __random()', ctx); }
   return code => vm.runInContext(code, ctx);
 }
+
+// ---------- taxes / accounts / retirement payout (unaffected by the market rework) ----------
 
 test('2026 taxes for a $34k barista', () => {
   const run = load();
@@ -71,28 +73,63 @@ test('retirement payout: early penalty before 60, Roth tax-free after', () => {
   assert.ok(late.total > early.total);
 });
 
-test('news reaction: part lands now, the rest over REACTION_MS', () => {
-  const run = load({ random: () => 0.5 }); // mid-range move, zero cosmetic jitter
-  run('var m = createMarket(); var c = m.companies.find(x => x.id === "drwl"); var p0 = c.anchor;');
-  run('applyMarketEvent(m, { sector: "oil", priceChangeRange: [9, 15] })');
-  const total = 12 * (0.6 + 1.1 * 0.6) / 100;           // DRWL volatility 1.1
-  assert.ok(Math.abs(run('c.anchor / p0') - (1 + total * 0.35)) < 1e-9);
-  run('for (let t = 0; t < REACTION_MS; t += MARKET_STEP_MS) stepMarket(m)');
-  assert.ok(Math.abs(run('c.anchor / p0') - (1 + total)) < 1e-9);
-  assert.equal(run('c.reactions.length'), 0);
+// ---------- real-data market (market.js) ----------
+
+test('real-stocks pool has enough real, well-formed history to deal from', () => {
+  const run = load();
+  const n = run('REAL_STOCKS.length');
+  assert.ok(n >= 6, `expected a real pool, got ${n}`);
+  assert.ok(run('REAL_STOCKS.every(s => Array.isArray(s.prices) && s.prices.length >= 100 && s.prices.every(p => typeof p === "number" && p > 0))'));
 });
 
-test('history is trimmed but keeps seq ids for trade markers', () => {
+test('a session deals exactly 6 distinct real stocks and starts at their real opening price', () => {
   const run = load();
-  run('var m = createMarket(); for (let i = 0; i < 900; i++) stepMarket(m)');
-  assert.equal(run('m.companies[0].history.length'), 800);
-  assert.equal(run('m.companies[0].history[799].seq'), run('m.seq'));
-  assert.equal(run('m.etfs[5].history[0].seq'), run('m.companies[0].history[0].seq'));
+  run('var m = createMarket()');
+  assert.equal(run('m.stocks.length'), 6);
+  assert.equal(run('new Set(m.stocks.map(s => s.id)).size'), 6);
+  assert.ok(run('m.stocks.every(s => { const real = REAL_STOCKS.find(r => r.id === s.id); return s.price === real.prices[0] && s.prices === real.prices; })'));
 });
 
-test('a full year: paycheck -> expenses -> invest -> year end', () => {
+test('stepMarket replays real recorded prices exactly, one bar per tick', () => {
   const run = load();
-  run('var m = createMarket(); var c = newCareer("Sam", "engineer", m); beginYear(c, m, null);');
+  run('var m = createMarket(); var s0 = m.stocks[0]; var real = s0.prices;');
+  run('stepMarket(m); stepMarket(m); stepMarket(m);');
+  assert.equal(run('m.stocks[0].price'), run('real[3]'));
+  assert.equal(run('m.stocks[0].idx'), 3);
+  assert.equal(run('m.stocks[0].history.length'), 4); // seed point + 3 steps
+  assert.equal(run('m.stocks[0].history[3].price'), run('real[3]'));
+});
+
+test('the market holds its last real price once a stock runs out of history, and reports finished', () => {
+  const run = load();
+  run('var m = createMarket(); var bars = m.barCount;');
+  run('for (let i = 0; i < bars - 1; i++) stepMarket(m);');
+  assert.equal(run('marketFinished(m)'), true);
+  const lastPrices = run('m.stocks.map(s => s.prices[s.prices.length - 1])');
+  assert.deepEqual(run('m.stocks.map(s => s.price)'), lastPrices);
+  run('stepMarket(m);'); // stepping past the end just holds
+  assert.deepEqual(run('m.stocks.map(s => s.price)'), lastPrices);
+});
+
+test('session duration matches the real history length (1 tick = REAL_TICK_MS)', () => {
+  const run = load();
+  run('var m = createMarket();');
+  assert.equal(run('sessionDurationMs(m)'), run('m.barCount * REAL_TICK_MS'));
+});
+
+test('drawYearlyMarketReturn stays within its clamped bounds', () => {
+  const run = load({ random: () => 0.999999 });
+  const hi = run('drawYearlyMarketReturn()');
+  assert.ok(hi <= 0.5);
+  const lo = load({ random: () => 0.000001 })('drawYearlyMarketReturn()');
+  assert.ok(lo >= -0.45);
+});
+
+// ---------- career loop (career-engine.js) ----------
+
+test('a full year: paycheck -> expenses -> invest -> year end (no market needed outside a session)', () => {
+  const run = load();
+  run('var c = newCareer("Sam", "engineer"); beginYear(c, null);');
   assert.equal(run('c.phase'), 'paycheck');
   assert.deepEqual([...run('payExpenses(c)')], []);
   assert.equal(run('c.phase'), 'invest');
@@ -104,17 +141,34 @@ test('a full year: paycheck -> expenses -> invest -> year end', () => {
   assert.equal(run('c.accounts.rothBasis'), 7500);
   assert.equal(run('c.brokerage.cash'), 5000);
   assert.equal(run('c.phase'), 'trade');
-  run('finishYear(c, m)');
+  run('finishYear(c)');
   assert.equal(run('c.phase'), 'review');
   assert.equal(run('c.age'), 23);
   assert.equal(run('c.timeline.length'), 2);
-  assert.equal(run('c.timeline[1].netWorth'), run('netWorth(c, m)'));
+  assert.equal(run('c.timeline[1].netWorth'), run('netWorth(c)'));
   assert.ok(run('c.cur.review.lesson').length > 10);
+  assert.equal(typeof run('c.cur.review.marketReturn'), 'number');
+});
+
+test('trading session cashes out into the brokerage: holdings never survive past the session', () => {
+  const run = load();
+  run('var c = newCareer("Robin", "nurse"); beginYear(c, null); payExpenses(c); investLeftover(c, { brokerage: 4000 });');
+  run('var m = createMarket(); var startValue = c.brokerage.cash;');
+  run('m.stocks[0].price = 50; c.brokerage.holdings[m.stocks[0].id] = 10; c.brokerage.cost[m.stocks[0].id] = 400;');
+  run('var endValue = 4000 - 400 + 10 * m.stocks[0].price;'); // cash left + current value of the position
+  run('recordTradingSession(c, m, startValue, endValue)');
+  assert.equal(run('c.brokerage.cash'), run('endValue'));
+  // spread into a plain object first: the vm context is a separate realm, so an
+  // object handed back from it has a different Object.prototype than {} here.
+  assert.deepEqual({ ...run('c.brokerage.holdings') }, {});
+  assert.deepEqual({ ...run('c.brokerage.cost') }, {});
+  assert.equal(run('c.cur.trade.pnl'), run('Math.round((endValue - startValue) * 100) / 100'));
+  assert.equal(run('c.stats.tradingPnl'), run('c.cur.trade.pnl'));
 });
 
 test('essential minimums are enforced and a shortfall becomes debt', () => {
   const run = load();
-  run('var m = createMarket(); var c = newCareer("Jo", "barista", m); beginYear(c, m, null);');
+  run('var c = newCareer("Jo", "barista"); beginYear(c, null);');
   run('c.expenses[0].monthly = 100');
   assert.ok(run('validateExpenses(c)').some(e => e.includes('Rent')));
   run('c.expenses[0].monthly = 3000');                  // way more than a barista takes home
@@ -124,26 +178,29 @@ test('essential minimums are enforced and a shortfall becomes debt', () => {
   assert.equal(run('c.cur.leftover'), 0);
 });
 
-test('fast-forward runs whole years and retirement ranks on the leaderboard', () => {
+test('a whole career to forced retirement at 70, played year by year (no skip-ahead exists)', () => {
   const run = load();
-  run('var m = createMarket(); var c = newCareer("Ana", "nurse", m); payExpenses(c); investLeftover(c, { k401: 4680, roth: 7500 }); finishYear(c, m);');
-  let years = 0;
-  while (run('autoYear(c, m)')) years++;
+  run('var c = newCareer("Ana", "nurse"); payExpenses(c); investLeftover(c, { k401: 4680, roth: 7500 }); finishYear(c);');
+  let years = 1;
+  while (run('c.age') < 70) {
+    run('beginYear(c, null); payExpenses(c); investLeftover(c, suggestedAllocation(c)); finishYear(c);');
+    years++;
+  }
   assert.equal(run('c.age'), 70);
-  assert.equal(years, 70 - 23);
-  assert.ok(run('autoYear(c, m)') === false);
-  const payout = run('retireCareer(c, m)');
+  assert.equal(years, 70 - run('CAREER.startAge')); // 48 birthdays: age 22 -> 70
+  const payout = run('retireCareer(c)');
   assert.equal(run('c.phase'), 'retired');
-  assert.equal(payout.penalties, 0);
+  assert.equal(payout.penalties, 0); // 70 is well past the penalty-free age
   assert.ok(payout.total > 0);
   const { board, rank } = run('addToLeaderboard([{ total: 1e12 }, { total: 1 }], { total: c.payout.total })');
   assert.equal(rank, 2);
   assert.equal(board.length, 3);
 });
 
-test('cannot retire mid-year', () => {
+test('cannot retire mid-year, and there is no way to skip a year', () => {
   const run = load();
-  run('var m = createMarket(); var c = newCareer("Lee", "teacher", m); payExpenses(c);');
+  assert.equal(run('typeof autoYear'), 'undefined'); // the fast-forward shortcut no longer exists in the engine
+  run('var c = newCareer("Lee", "teacher"); payExpenses(c);');
   assert.equal(run('c.phase'), 'invest');
-  assert.equal(run('retireCareer(c, m)'), null);
+  assert.equal(run('retireCareer(c)'), null);
 });

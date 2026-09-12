@@ -22,19 +22,18 @@
   };
 
   let career = null;
-  let market = null;
+  let market = null; // only non-null while a trading session is actively open
   let floor = null;
 
   // ---------- persistence ----------
   function save() {
     if (!career || career.phase === 'retired') return;
-    career.marketPrices = marketPrices(market);
     storage.set(SAVE_KEY, JSON.stringify(career));
   }
   function loadSave() {
     try {
       const c = JSON.parse(storage.get(SAVE_KEY));
-      return c && c.version === 1 && c.cur && c.phase !== 'retired' ? c : null;
+      return c && c.version === 2 && c.cur && c.phase !== 'retired' ? c : null;
     } catch { return null; }
   }
   function loadBoard() {
@@ -92,7 +91,7 @@
           </div>
           <button class="btn primary big" type="submit">Start at age ${CAREER.startAge} &rarr;</button>
         </form>
-        <a class="sandbox-link" href="investing.html">Just want to trade? Open the 12-minute trading sandbox &rarr;</a>
+        <a class="sandbox-link" href="investing.html">Just want to trade? Open the standalone trading floor &rarr;</a>
       </section>
       <section class="card"><h3>&#127942; Leaderboard</h3>${boardHtml(loadBoard())}</section>
     </div>`;
@@ -108,7 +107,7 @@
         <span class="chip">Salary <b>${fmt(c.salary)}</b></span>
       </div>
       <div class="spacer"></div>
-      <div class="metric"><div class="label">Net worth</div><div class="val">${fmt(netWorth(c, market))}</div></div>
+      <div class="metric"><div class="label">Net worth</div><div class="val">${fmt(netWorth(c))}</div></div>
       <button class="btn ghost small" data-action="askRetire" ${canRetire(c) ? '' : 'disabled title="Finish this year first"'}>Retire</button>`;
   }
 
@@ -123,7 +122,7 @@
     const stocks = holdingsValue(market, c.brokerage.holdings);
     const rows = [
       ['Savings', `${(CAREER.savingsApy * 100).toFixed(1)}% APY`, a.savings],
-      ['Brokerage', `${fmt(c.brokerage.cash)} cash · ${fmt(stocks)} stocks`, brokerageValue(c, market)],
+      ['Brokerage', `${fmt(c.brokerage.cash)} cash · ${fmt(stocks)} stocks`, brokerageValue(c, market)], // market is null outside a session; holdings are then always empty
       ['401(k)', 'pre-tax · tracks the market', a.k401],
       ['Traditional IRA', 'pre-tax · tracks the market', a.tradIra],
       ['Roth IRA', 'tax-free later · tracks the market', a.roth],
@@ -132,7 +131,7 @@
     return `<div class="card">
         <h3>Your accounts</h3>
         ${rows.map(([name, sub, v]) => `<div class="acct ${v < 0 ? 'debt' : ''}"><div>${name}<span class="sub">${sub}</span></div><b>${fmt(v)}</b></div>`).join('')}
-        <div class="acct-total"><span>Net worth</span><span>${fmt(netWorth(c, market))}</span></div>
+        <div class="acct-total"><span>Net worth</span><span>${fmt(netWorth(c))}</span></div>
       </div>
       <div class="card"><h3>Net worth by age</h3>${chartHtml(false)}</div>
       <div class="card">
@@ -213,7 +212,7 @@
     ];
     return `${eyebrow()}
       <h2>Put your leftover money to work</h2>
-      <p class="lead">Your 401(k) and IRAs follow the whole stock market. The brokerage account is yours to trade.</p>
+      <p class="lead">Your 401(k) and IRAs quietly follow the whole stock market every year. The brokerage account is real stocks you trade yourself.</p>
       ${cur.shortfall ? `<div class="callout warn">Expenses ran ${fmt(cur.shortfall.total)} over your pay.
         ${cur.shortfall.fromSavings ? `${fmt(cur.shortfall.fromSavings)} came from savings. ` : ''}${cur.shortfall.fromBrokerage ? `${fmt(cur.shortfall.fromBrokerage)} came from brokerage cash. ` : ''}${cur.shortfall.toDebt ? `<b>${fmt(cur.shortfall.toDebt)} went on a credit card.</b>` : ''}</div>` : ''}
       <div class="available">
@@ -266,7 +265,7 @@
   // ---------- phase: trade ----------
   function tradeHtml() {
     const c = career, cur = c.cur;
-    const value = brokerageValue(c, market), stocks = holdingsValue(market, c.brokerage.holdings);
+    const value = brokerageValue(c), stocks = holdingsValue(market, c.brokerage.holdings);
     const next = '<div class="actions"><button class="btn primary" data-action="finishYear">Close out the year &rarr;</button></div>';
     if (cur.tradeUsed) {
       return `${eyebrow()}<h2>Trading's done for this year</h2>
@@ -278,11 +277,10 @@
     }
     return `${eyebrow()}
       <h2>Trade your brokerage account</h2>
-      <p class="lead">You have <b>${fmt(c.brokerage.cash)}</b> in cash and <b>${fmt(stocks)}</b> in stocks. Open the trading floor for a ${CAREER.tradingSessionSec}-second session, or skip and hold.</p>
+      <p class="lead">You have <b>${fmt(c.brokerage.cash)}</b> in cash and <b>${fmt(stocks)}</b> in stocks. Open the trading floor for a short real-data session, or skip and hold.</p>
       <ul class="tips">
-        <li>Breaking news moves a whole sector. Part of the move lands instantly; the rest plays out over about 15 seconds.</li>
-        <li>Yellow tickers are ETFs: a whole sector in one buy. GRPX is the entire market, the same index your 401(k) and IRAs follow.</li>
-        <li>Whatever you still hold when the session ends rides the rest of the year's market move.</li>
+        <li>These are 6 real stocks and their actual recent prices, replayed faster than real time. Nothing tells you which way a price is about to move.</li>
+        <li>Whatever you still hold when the session ends is automatically sold at its last price, so this year's brokerage cash carries into next year.</li>
       </ul>
       <div class="actions"><button class="btn ghost" data-action="finishYear">Skip, hold my positions</button><button class="btn primary" data-action="openTrading">Open the trading floor &rarr;</button></div>`;
   }
@@ -294,14 +292,12 @@
     const atMax = c.age >= CAREER.maxAge;
     return `<div class="eyebrow">Year ${c.year} complete · you're now ${c.age}</div>
       <h2>Year in review</h2>
-      ${cur.autoPlayed ? `<div class="callout info">Fast-forwarded ${cur.autoPlayed} year${cur.autoPlayed === 1 ? '' : 's'} using the same expenses and investment plan (no trading). This is the latest year.</div>` : ''}
       <div class="big-number">${fmt(r.netWorthEnd)} <span class="${tone(delta)}">${signed(delta)}</span></div>
       <div class="fine">Net worth this year</div>
       <table class="money-table">
-        <tr><td>Stock market <span class="hint">GRPX index</span></td><td class="${tone(r.indexReturn)}">${pct(r.indexReturn)}</td></tr>
+        <tr><td>Overall market return <span class="hint">drives your 401(k)/IRA growth</span></td><td class="${tone(r.marketReturn)}">${pct(r.marketReturn)}</td></tr>
         <tr><td>Retirement accounts, market gain</td><td class="${tone(r.retirementGrowth)}">${signed(r.retirementGrowth)}</td></tr>
         ${cur.trade ? `<tr><td>Trading session</td><td class="${tone(cur.trade.pnl)}">${signed(cur.trade.pnl)}</td></tr>` : ''}
-        ${r.brokerageMarketMove ? `<tr><td>Brokerage, rest-of-year move</td><td class="${tone(r.brokerageMarketMove)}">${signed(r.brokerageMarketMove)}</td></tr>` : ''}
         ${cur.plan && cur.plan.match ? `<tr class="plus"><td>Employer match</td><td>+${fmt(cur.plan.match)}</td></tr>` : ''}
         <tr class="plus"><td>Savings interest</td><td>+${fmt(r.interest)}</td></tr>
         ${r.debtInterest ? `<tr class="minus"><td>Credit-card interest</td><td>-${fmt(r.debtInterest)}</td></tr>` : ''}
@@ -313,7 +309,6 @@
         ${atMax
           ? `<span class="fine">You've reached ${CAREER.maxAge}. Time to retire.</span><button class="btn primary" data-action="askRetire">Retire &rarr;</button>`
           : `<button class="btn ghost" data-action="askRetire">Retire at ${c.age}</button>
-             <button class="btn ghost" data-action="fastForward">Fast-forward ${Math.min(CAREER.fastForwardYears, CAREER.maxAge - c.age)} years</button>
              <button class="btn primary" data-action="nextYear">Start year ${c.year + 1} &rarr;</button>`}
       </div>`;
   }
@@ -384,17 +379,16 @@
     const host = el('tradingHost');
     host.hidden = false;
     document.body.classList.add('no-scroll');
+    market = createMarket(); // fresh random 6 real stocks for this session
     let endBtn = null, backBtn = null;
     floor = createTradingFloor(host, {
       market,
       account: c.brokerage,
-      durationMs: CAREER.tradingSessionSec * 1000,
-      eventMinMs: CAREER.tradingEventMinMs,
-      eventMaxMs: CAREER.tradingEventMaxMs,
       title: `Grapefruit Trading · ${esc(c.name)}'s brokerage`,
       onChange: save,
       onEnd({ startValue, endValue }) {
-        recordTradingSession(c, startValue, endValue);
+        recordTradingSession(c, market, startValue, endValue);
+        market = null;
         save();
         floor.closeDetail();
         endBtn.hidden = true;
@@ -416,14 +410,14 @@
     }
     el('tradingHost').hidden = true;
     document.body.classList.remove('no-scroll');
-    finishYear(career, market);
+    finishYear(career);
     go();
   }
 
   // ---------- retire ----------
   function askRetire() {
     if (!canRetire(career)) return;
-    const p = previewRetirement(career, market);
+    const p = previewRetirement(career);
     el('confirmCard').innerHTML = `<h2>Retire at ${career.age}?</h2>
       <div class="sub">You'll cash out every account and this career ends.</div>
       <div class="summary-grid">
@@ -442,7 +436,7 @@
 
   function retire() {
     closeConfirm();
-    const payout = retireCareer(career, market);
+    const payout = retireCareer(career);
     if (!payout) return;
     const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: career.name, job: career.jobTitle, age: career.age, total: payout.total, gross: payout.gross, date: new Date().toISOString().slice(0, 10) };
     const { board, rank } = addToLeaderboard(loadBoard(), entry);
@@ -456,7 +450,7 @@
 
   // ---------- actions ----------
   const actions = {
-    continue() { career = loadSave(); if (!career) { render(); return; } market = createMarket(career.marketPrices); go(); },
+    continue() { career = loadSave(); if (!career) { render(); return; } go(); },
     abandon() { storage.remove(SAVE_KEY); render(); },
     toExpenses() { career.phase = 'expenses'; go(); },
     addExpense() {
@@ -492,14 +486,8 @@
       go();
     },
     openTrading,
-    finishYear() { finishYear(career, market); go(); },
-    nextYear() { beginYear(career, market); go(); },
-    fastForward() {
-      let years = 0;
-      while (years < CAREER.fastForwardYears && autoYear(career, market)) years++;
-      if (years) career.cur.autoPlayed = years;
-      go();
-    },
+    finishYear() { finishYear(career); go(); },
+    nextYear() { beginYear(career); go(); },
     askRetire,
     closeConfirm,
     retire,
@@ -533,8 +521,7 @@
     const name = el('nameInput').value.trim();
     if (!name) { el('nameInput').focus(); return; }
     const job = (e.target.querySelector('input[name="job"]:checked') || {}).value;
-    market = createMarket();
-    career = newCareer(name, job, market);
+    career = newCareer(name, job);
     go();
   });
 

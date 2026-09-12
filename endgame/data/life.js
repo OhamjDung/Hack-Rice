@@ -11,10 +11,6 @@ const CAREER = {
   inflation: 0.025,        // raises tax brackets, limits and expense minimums each year
   savingsApy: 0.035,       // high-yield savings account
   debtApr: 0.22,           // credit-card debt covers any shortfall
-  tradingSessionSec: 90,
-  tradingEventMinMs: 4000,
-  tradingEventMaxMs: 9000,
-  fastForwardYears: 5,
 };
 
 const JOBS = [

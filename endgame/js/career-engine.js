@@ -1,19 +1,26 @@
 /* Nest Egg career engine: the yearly loop as plain functions over a career
-   object (mutated in place) and a market from market.js. No DOM. career.js
-   renders it; tests/nestegg.test.mjs drives it in Node.
+   object (mutated in place). No DOM. career.js renders it; tests/nestegg.test.mjs
+   drives it in Node.
 
-   One round = one year of work:
+   One round = one year of work, played by hand — there is no skip-ahead:
      beginYear      phase 'paycheck'  salary, life event, taxes -> take-home
      payExpenses    phase 'expenses'  player-written monthly costs x 12
      investLeftover phase 'invest'    401(k) / Traditional IRA / Roth IRA / brokerage
-     (trading)      phase 'trade'     optional timed session on the brokerage account
+     (trading)      phase 'trade'     optional real-data trading session on the brokerage account
      finishYear     phase 'review'    market year, interest, raise, age + 1
-   retireCareer is allowed at 'paycheck' or 'review' and ends the run ('retired'). */
+   retireCareer is allowed at 'paycheck' or 'review' and ends the run ('retired').
 
-function newCareer(name, jobId, market) {
+   The brokerage account only holds live positions while a trading session is
+   open (see recordTradingSession) — between sessions it's just cash, since
+   each session deals a fresh random 6 real stocks and there's no ongoing
+   price for a stock that isn't in play. 401(k)/Traditional IRA/Roth IRA
+   balances aren't hand-traded at all; they grow once a year off
+   drawYearlyMarketReturn() in market.js, same as a broad index fund. */
+
+function newCareer(name, jobId) {
   const job = JOBS.find(j => j.id === jobId) || JOBS[0];
   const c = {
-    version: 1,
+    version: 2,
     name: String(name || '').trim().slice(0, 24) || 'Player',
     jobId: job.id,
     jobTitle: job.title,
@@ -28,25 +35,25 @@ function newCareer(name, jobId, market) {
     lastAlloc: { k401: 0, tradIra: 0, roth: 0, brokerage: 0 },
     stats: { match: 0, taxSaved: 0, contributed: 0, tradingPnl: 0 },
     timeline: [{ age: CAREER.startAge, netWorth: 0 }],
-    marketPrices: marketPrices(market),
     cur: null,
     payout: null,
   };
-  beginYear(c, market);
+  beginYear(c);
   return c;
 }
 
 function expenseMinimum(c, e) { return e.essential ? roundTo(e.min * inflationFactor(c.year), 10) : 0; }
 function monthlyExpenses(c) { return roundMoney(c.expenses.reduce((n, e) => n + (Number(e.monthly) || 0), 0)); }
+// `market` is only ever non-null transiently, while a trading session is open — see recordTradingSession.
 function brokerageValue(c, market) { return roundMoney(c.brokerage.cash + holdingsValue(market, c.brokerage.holdings)); }
-function netWorth(c, market) {
+function netWorth(c) {
   const a = c.accounts;
-  return roundMoney(a.savings + brokerageValue(c, market) + a.k401 + a.tradIra + a.roth - a.debt);
+  return roundMoney(a.savings + brokerageValue(c) + a.k401 + a.tradIra + a.roth - a.debt);
 }
 function canRetire(c) { return c.phase === 'paycheck' || c.phase === 'review'; }
 
 // `forcedEvent`: omit for a random life event, pass null for none (tests).
-function beginYear(c, market, forcedEvent) {
+function beginYear(c, forcedEvent) {
   const event = forcedEvent !== undefined ? forcedEvent
     : Math.random() < LIFE_EVENT_CHANCE ? LIFE_EVENTS[Math.floor(Math.random() * LIFE_EVENTS.length)] : null;
   if (event && event.raisePct) c.salary = roundMoney(c.salary * (1 + event.raisePct));
@@ -63,8 +70,7 @@ function beginYear(c, market, forcedEvent) {
     taxes,
     takeHome: roundMoney(gross - taxes.total),
     bumped,
-    indexStart: marketIndexPrice(market),
-    netWorthStart: netWorth(c, market),
+    netWorthStart: netWorth(c),
     expensesPaid: 0,
     leftover: 0,
     shortfall: null,
@@ -148,14 +154,20 @@ function investLeftover(c, alloc) {
   return plan;
 }
 
-function recordTradingSession(c, startValue, endValue) {
+// Ends the brokerage's live trading session: whatever's still held gets
+// marked to its last traded price and folded into cash, since next year's
+// session deals a completely different random 6 stocks.
+function recordTradingSession(c, market, startValue, endValue) {
   const pnl = roundMoney(endValue - startValue);
+  c.brokerage.cash = endValue;
+  c.brokerage.holdings = {};
+  c.brokerage.cost = {};
   c.cur.tradeUsed = true;
   c.cur.trade = { startValue: roundMoney(startValue), endValue: roundMoney(endValue), pnl };
   c.stats.tradingPnl = roundMoney(c.stats.tradingPnl + pnl);
 }
 
-function yearLesson(c, indexReturn) {
+function yearLesson(c, marketReturn) {
   const cur = c.cur, salary = c.salary;
   const fullMatch = employerMatch(salary, salary * ACCOUNT_RULES.matchCapPct);
   const missedMatch = cur.plan ? roundMoney(fullMatch - cur.plan.match) : 0;
@@ -163,20 +175,19 @@ function yearLesson(c, indexReturn) {
   if (missedMatch > 1) return `You left ${fmtMoney(missedMatch)} of free employer match on the table. Putting ${Math.round(ACCOUNT_RULES.matchCapPct * 100)}% of your salary in your 401(k) gets all of it.`;
   const yearExpenses = cur.expensesPaid || monthlyExpenses(c) * 12;
   if (yearExpenses > 0 && c.accounts.savings > yearExpenses * 1.5) return `You have ${fmtMoney(c.accounts.savings)} sitting in savings, more than a year and a half of expenses. A cushion is smart, but past that, cash earning ${(CAREER.savingsApy * 100).toFixed(1)}% falls behind the market. Consider investing more of it.`;
-  if (indexReturn <= -0.1) return `The market fell ${Math.abs(indexReturn * 100).toFixed(0)}%. Your retirement accounts dipped, but next year's contributions buy shares on sale. Staying invested is how downturns get recovered.`;
+  if (marketReturn <= -0.1) return `The market fell ${Math.abs(marketReturn * 100).toFixed(0)}%. Your retirement accounts dipped, but next year's contributions buy shares on sale. Staying invested is how downturns get recovered.`;
   if (cur.trade && cur.trade.pnl < 0) return `Trading lost ${fmtMoney(-cur.trade.pnl)} this year. Most investors do better simply holding the whole market.`;
-  if (indexReturn >= 0.15) return `A great year: the market rose ${(indexReturn * 100).toFixed(0)}%. The longer money stays invested, the more of your growth comes from growth itself.`;
+  if (marketReturn >= 0.15) return `A great year: the market rose ${(marketReturn * 100).toFixed(0)}%. The longer money stays invested, the more of your growth comes from growth itself.`;
   return 'At 7% a year, money doubles about every 10 years. Every year you stay invested gives compounding more time.';
 }
 
-// The rest of the year: market move, interest, raise, birthday.
-function finishYear(c, market) {
+// The rest of the year: retirement accounts grow with the market, savings earn
+// interest, debt accrues, salary gets a raise, and you turn a year older.
+function finishYear(c) {
   const cur = c.cur, acc = c.accounts;
   const retirementBefore = acc.k401 + acc.tradIra + acc.roth;
-  const brokerageBefore = brokerageValue(c, market);
-  applyYearlyMarketMove(market);
-  const growth = cur.indexStart > 0 ? marketIndexPrice(market) / cur.indexStart : 1;
-  ['k401', 'tradIra', 'roth'].forEach(k => { acc[k] = roundMoney(acc[k] * growth); });
+  const marketReturn = drawYearlyMarketReturn();
+  ['k401', 'tradIra', 'roth'].forEach(k => { acc[k] = roundMoney(acc[k] * (1 + marketReturn)); });
   const interest = roundMoney(acc.savings * CAREER.savingsApy);
   acc.savings = roundMoney(acc.savings + interest);
   const debtInterest = roundMoney(acc.debt * CAREER.debtApr);
@@ -185,17 +196,15 @@ function finishYear(c, market) {
   acc.savings = roundMoney(acc.savings - debtPaidFromSavings);
   acc.debt = roundMoney(acc.debt - debtPaidFromSavings);
 
-  const lesson = yearLesson(c, growth - 1);
+  const lesson = yearLesson(c, marketReturn);
   c.age += 1;
   c.year += 1;
   c.salary = roundMoney(c.salary * (1 + c.raise));
-  const nw = netWorth(c, market);
+  const nw = netWorth(c);
   c.timeline.push({ age: c.age, netWorth: nw });
-  c.marketPrices = marketPrices(market);
   cur.review = {
-    indexReturn: growth - 1,
+    marketReturn,
     retirementGrowth: roundMoney(acc.k401 + acc.tradIra + acc.roth - retirementBefore),
-    brokerageMarketMove: roundMoney(brokerageValue(c, market) - brokerageBefore),
     interest,
     debtInterest,
     debtPaidFromSavings,
@@ -222,27 +231,13 @@ function suggestedAllocation(c) {
   return scaled(lo);
 }
 
-// Plays one whole year on autopilot (same expenses, last plan, no trading).
-// Only runs from a year-end review. Returns false if it can't.
-function autoYear(c, market) {
-  if (c.phase !== 'review' || c.age >= CAREER.maxAge) return false;
-  beginYear(c, market);
-  c.expenses.forEach(e => { if (!String(e.label || '').trim()) e.label = 'Expense'; });
-  payExpenses(c);
-  investLeftover(c, suggestedAllocation(c));
-  c.cur.tradeUsed = true;
-  finishYear(c, market);
-  return true;
+function previewRetirement(c) {
+  return retirementPayout(c.accounts, brokerageValue(c), c.age);
 }
 
-function previewRetirement(c, market) {
-  return retirementPayout(c.accounts, brokerageValue(c, market), c.age);
-}
-
-function retireCareer(c, market) {
+function retireCareer(c) {
   if (!canRetire(c)) return null;
-  settleMarketReactions(market);
-  c.payout = previewRetirement(c, market);
+  c.payout = previewRetirement(c);
   c.phase = 'retired';
   return c.payout;
 }
