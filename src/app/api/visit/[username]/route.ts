@@ -11,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ usernam
   const parsed = usernameSchema.safeParse((await params).username);
   if (!parsed.success) return Response.json({ success: false, error: 'Invalid username.' }, { status: 400 });
 
-  const user = await db().query<{ id: string }>('SELECT id FROM users WHERE username = $1', [parsed.data]);
+  const user = await db().query<{ id: string; username: string }>('SELECT id, username FROM users WHERE lower(username) = lower($1)', [parsed.data]);
   const target = user.rows[0];
   if (!target) return Response.json({ success: false, error: 'No account with that username.' }, { status: 404 });
   if (target.id === userId) return Response.json({ success: false, error: "You can't visit yourself." }, { status: 400 });
@@ -21,5 +21,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ usernam
 
   const state = await db().query<{ state: unknown }>('SELECT state FROM game_states WHERE user_id = $1', [target.id]);
   if (!state.rowCount) return Response.json({ success: false, error: 'That account has no room yet.' }, { status: 404 });
-  return Response.json({ success: true, data: { username: parsed.data, state: state.rows[0].state } });
+  return Response.json({ success: true, data: { username: target.username, state: state.rows[0].state } });
 }

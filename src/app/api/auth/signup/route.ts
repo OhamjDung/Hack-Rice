@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const input = signupInput.safeParse(await req.json().catch(() => null));
   if (!input.success) return Response.json({ success: false, error: 'Enter a username (3-24 letters/numbers/underscore) and a password of at least 6 characters.' }, { status: 400 });
   const { username, password, initialState } = input.data;
-  const existing = await db().query('SELECT id FROM users WHERE username = $1', [username]);
+  const existing = await db().query('SELECT id FROM users WHERE lower(username) = lower($1)', [username]);
   if (existing.rowCount) return Response.json({ success: false, error: 'That username is already taken.' }, { status: 409 });
   const id = randomUUID();
   const passwordHash = await hashPassword(password);
