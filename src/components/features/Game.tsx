@@ -187,7 +187,7 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
     // as soon as a visit actually succeeded.
     if (visiting) return <div className="game-world visiting-world" data-testid="game-world-visiting">
       <div className="visit-banner" role="status">Visiting <strong>{visiting.username}</strong>'s room (read-only, live) <button className="button secondary" onClick={leaveVisit}>Leave</button></div>
-      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}} guests={[{ label: 'You', color: game.player.shirtColor }]}/></div>
+      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}} guests={[{ label: 'You', color: game.player.shirtColor }]} readOnly/></div>
     </div>;
     return <div className={`game-world ${!game.life.powerOn?'blackout':''} ${game.life.stress>=35?'stressed':''}`} data-testid="game-world">
       <div className="world-grain" aria-hidden="true"/>
