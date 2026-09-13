@@ -5,12 +5,14 @@ import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
 import { drawStockBoard } from './StockBoard';
 import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath as routePath, foregroundWalls, roomObjects, placementError, type RoomLayout, type FurnitureId, type RoomObject } from './IsometricEngine';
-export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, paused=false }: {
+export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, onSwipeCharacter, paused=false }: {
     game: GameState;
     onLayoutChange: (layout:RoomLayout)=>void;
     onInspect: (c: CategoryKey | 'desk') => void;
     onScene?: (line:string)=>void;
     onEndingComplete?:()=>void;
+    /** Swipe (drag) the character sprite itself past a distance threshold — used to trigger visiting another room. */
+    onSwipeCharacter?: () => void;
     paused?:boolean;
 }) {
     const [arranging,setArranging]=useState(false);
@@ -48,6 +50,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const camera=useRef({angle:0,zoom:1.1});
     const requestedCamera=useRef({rotation,zoom});requestedCamera.current={rotation,zoom};
     const drag=useRef<{id:number;x:number;y:number;rotation:number;moved:boolean}|null>(null);
+    const charDrag=useRef<{id:number;x:number}|null>(null);
+    const onSwipeCharacterRef=useRef(onSwipeCharacter);onSwipeCharacterRef.current=onSwipeCharacter;
     const inspectCallback=useRef(onInspect);inspectCallback.current=onInspect;
     const pendingInspect=useRef<CategoryKey|'desk'|null>(null);
     const hover=useRef<RoomObject|undefined>(undefined);
@@ -317,10 +321,22 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     }, []);
     function pointer(e:React.PointerEvent<HTMLCanvasElement>){const r=e.currentTarget.getBoundingClientRect(),z=camera.current.zoom;return {x:((e.clientX-r.left)/r.width*ROOM_VIEW.width-ROOM_VIEW.width/2)/z+360,y:((e.clientY-r.top)/r.height*ROOM_VIEW.height-ROOM_VIEW.height/2)/z+285};}
     function hitAt(x:number,y:number){return [...objectsRef.current].sort((a,b)=>projectRoom(b.x,b.y,camera.current.angle).screenY-projectRoom(a.x,a.y,camera.current.angle).screenY).find(o=>{const p=projectRoom(o.x+o.w/2,o.y+o.d/2,camera.current.angle);return Math.abs(x-p.screenX)<34&&y>p.screenY-65&&y<p.screenY+12;});}
+    function avatarHit(x:number,y:number){const a=avatar.current;const p=projectRoom(a.x+.5,a.y+.5,camera.current.angle);return Math.abs(x-p.screenX)<34&&y>p.screenY-70&&y<p.screenY+15;}
     function inspect(e:React.PointerEvent<HTMLCanvasElement>){if(current.current.isGameOver)return;const {x,y}=pointer(e);const hit=hitAt(x,y);pendingInspect.current=hit?.id??null;const p=unprojectRoom(x,y,camera.current.angle);path.current=findPath(avatar.current,hit||{x:p.gridX,y:p.gridY});nextWander.current=performance.now()+10000;}
-    function pointerDown(e:React.PointerEvent<HTMLCanvasElement>){if(e.button!==0||!e.isPrimary)return;e.currentTarget.focus({preventScroll:true});drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,rotation:requestedCamera.current.rotation,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}
-    function pointerMove(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(d&&d.id===e.pointerId){const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;if(d.moved){setRotation(d.rotation+dx/e.currentTarget.getBoundingClientRect().width*360);hover.current=undefined;e.currentTarget.style.cursor='grabbing';}return;}const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'grab';}
-    function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved){if(arranging){const point=pointer(e),hit=hitAt(point.x,point.y);if(hit)setSelected(hit.id);else{const tile=unprojectRoom(point.x,point.y,camera.current.angle);moveSelected(tile.gridX,tile.gridY);}}else inspect(e);}}
+    function pointerDown(e:React.PointerEvent<HTMLCanvasElement>){
+        if(e.button!==0||!e.isPrimary)return;
+        e.currentTarget.focus({preventScroll:true});
+        const point=pointer(e);
+        if(!arrangeRef.current&&onSwipeCharacterRef.current&&avatarHit(point.x,point.y)){charDrag.current={id:e.pointerId,x:e.clientX};e.currentTarget.setPointerCapture(e.pointerId);return;}
+        drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,rotation:requestedCamera.current.rotation,moved:false};e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    function pointerMove(e:React.PointerEvent<HTMLCanvasElement>){
+        const cd=charDrag.current;if(cd&&cd.id===e.pointerId){e.currentTarget.style.cursor='grabbing';return;}
+        const d=drag.current;if(d&&d.id===e.pointerId){const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;if(d.moved){setRotation(d.rotation+dx/e.currentTarget.getBoundingClientRect().width*360);hover.current=undefined;e.currentTarget.style.cursor='grabbing';}return;}const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'grab';}
+    function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){
+        const cd=charDrag.current;
+        if(cd&&cd.id===e.pointerId){charDrag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(Math.abs(e.clientX-cd.x)>56)onSwipeCharacterRef.current?.();return;}
+        const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved){if(arranging){const point=pointer(e),hit=hitAt(point.x,point.y);if(hit)setSelected(hit.id);else{const tile=unprojectRoom(point.x,point.y,camera.current.angle);moveSelected(tile.gridX,tile.gridY);}}else inspect(e);}}
     function moveSelected(x:number,y:number){
         const error=placementError(objectsRef.current,selected,x,y,avatar.current);
         if(error){setLayoutMessage(error);return;}
@@ -329,6 +345,6 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
         setLayoutMessage('Layout saved. Choose another item or select Done.');
     }
     function nudge(dx:number,dy:number){const o=objectsRef.current.find(o=>o.id===selected)!;moveSelected(Math.round((o.x+dx)*10)/10,Math.round((o.y+dy)*10)/10);}
-    function cancelDrag(){drag.current=null;}
-    return <div className="room-scene"><canvas ref={ref} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag} onPointerLeave={()=>{hover.current=undefined;}} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setRotation(r=>r+(e.key==='ArrowLeft'?-15:15));}if(e.key==='Home'){e.preventDefault();setRotation(0);}}} tabIndex={0} aria-label="Apartment with a simulated stock board on the wall. Hold and drag to rotate; click furniture to interact. Arrow keys rotate; Home resets." aria-keyshortcuts="ArrowLeft ArrowRight Home" role="img"/><div className="scene-controls" aria-label="Room camera"><button className="camera-action" aria-pressed={arranging} disabled={game.isGameOver} onClick={()=>{setArranging(v=>!v);path.current=[];pendingInspect.current=null;}}> {arranging?'Done':'Arrange furniture'}</button><output aria-label="Room angle">{Math.round(((rotation%360)+360)%360)}°</output><button className="camera-action" aria-label="Reset room view" onClick={()=>{setRotation(0);setZoom(1.1);}}>Reset</button><button aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(.8,Math.round((z-.1)*10)/10))} disabled={zoom<=.8}>−</button><span>{Math.round(zoom*100)}%</span><button aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(ROOM_VIEW.maxZoom,Math.round((z+.1)*10)/10))} disabled={zoom>=ROOM_VIEW.maxZoom}>+</button></div>{arranging&&<div className="furniture-controls" aria-label="Arrange furniture"><label>Furniture <select value={selected} onChange={e=>setSelected(e.target.value as FurnitureId)}>{objectsRef.current.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}</select></label><div><button onClick={()=>nudge(-1,0)}>Move left</button><button onClick={()=>nudge(1,0)}>Move right</button><button onClick={()=>nudge(0,-1)}>Move back</button><button onClick={()=>nudge(0,1)}>Move forward</button><button onClick={()=>{onLayoutChange({});avatar.current={x:5,y:5,z:0,v:0};path.current=[];pendingInspect.current=null;hover.current=undefined;setLayoutMessage('Original layout restored.');}}>Reset layout</button></div><p role="status">{layoutMessage}</p></div>}</div>;
+    function cancelDrag(){drag.current=null;charDrag.current=null;}
+    return <div className="room-scene"><canvas ref={ref} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag} onPointerLeave={()=>{hover.current=undefined;}} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setRotation(r=>r+(e.key==='ArrowLeft'?-15:15));}if(e.key==='Home'){e.preventDefault();setRotation(0);}}} tabIndex={0} aria-label="Apartment with a simulated stock board on the wall. Hold and drag to rotate; click furniture to interact; drag your character to visit a friend's room. Arrow keys rotate; Home resets." aria-keyshortcuts="ArrowLeft ArrowRight Home" role="img"/><div className="scene-controls" aria-label="Room camera"><button className="camera-action" aria-pressed={arranging} disabled={game.isGameOver} onClick={()=>{setArranging(v=>!v);path.current=[];pendingInspect.current=null;}}> {arranging?'Done':'Arrange furniture'}</button><output aria-label="Room angle">{Math.round(((rotation%360)+360)%360)}°</output><button className="camera-action" aria-label="Reset room view" onClick={()=>{setRotation(0);setZoom(1.1);}}>Reset</button><button aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(.8,Math.round((z-.1)*10)/10))} disabled={zoom<=.8}>−</button><span>{Math.round(zoom*100)}%</span><button aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(ROOM_VIEW.maxZoom,Math.round((z+.1)*10)/10))} disabled={zoom>=ROOM_VIEW.maxZoom}>+</button></div>{arranging&&<div className="furniture-controls" aria-label="Arrange furniture"><label>Furniture <select value={selected} onChange={e=>setSelected(e.target.value as FurnitureId)}>{objectsRef.current.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}</select></label><div><button onClick={()=>nudge(-1,0)}>Move left</button><button onClick={()=>nudge(1,0)}>Move right</button><button onClick={()=>nudge(0,-1)}>Move back</button><button onClick={()=>nudge(0,1)}>Move forward</button><button onClick={()=>{onLayoutChange({});avatar.current={x:5,y:5,z:0,v:0};path.current=[];pendingInspect.current=null;hover.current=undefined;setLayoutMessage('Original layout restored.');}}>Reset layout</button></div><p role="status">{layoutMessage}</p></div>}</div>;
 }
