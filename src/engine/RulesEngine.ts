@@ -3,6 +3,7 @@ import { categories, type GameState, type Profile, type BankTransaction, type Ca
 import { CATEGORY_META, DEFAULT_PROFILE } from './Constants.ts';
 import { DAYS_PER_MONTH,dayOfMonth,localDailyReview } from './DailyReview.ts';
 import { INITIAL_LIFE, transactionScene } from './Life.ts';
+import { INITIAL_INVESTING, growAccounts } from './Investing.ts';
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 const round = (n: number) => Math.round(n * 100) / 100;
 export function careForHome(state:GameState,action:'rest'|'tidy'):GameState {
@@ -23,7 +24,7 @@ export function careForHome(state:GameState,action:'rest'|'tidy'):GameState {
 }
 export function createGame(profile: Profile = DEFAULT_PROFILE): GameState {
     const jar = (category: CategoryKey) => ({ category, allocatedAmount: profile.allocations[category], spentAmount: 0, rolloverAmount: 0, minViableSpend: CATEGORY_META[category].minimum });
-    return { version: 2,progression:{coins:0,claimed:[],owned:[],coinLog:[]},dialogue:[],ending:{phase:'none',kind:'none',reason:''}, reviews:[],command:{message:'',severity:'info',behavior:'calm',day:0}, life:{...INITIAL_LIFE}, profile, player: { ...profile, position: { x: 6, y: 6, z: 300 }, targetPosition: null, state: 'idle' }, metrics: { health: 100, happiness: 80, cashBalance: profile.income, debtBalance: 0, turn: 1, roomLevel: 1 }, jars: { food: jar('food'), housing: jar('housing'), transit: jar('transit'), leisure: jar('leisure'), utilities: jar('utilities'), savings: jar('savings') }, transactions: [], advisorLog: [{ timestamp: 0, severity: 'info', message: 'A fresh apartment. A fresh start. Give every dollar a place to call home.', actionablePlan: ['Cover your essentials first.', 'Put something aside for future you.'] }], isGameOver: false, housingDeficits: 0, savedTotal: 0, completedMonths: 0, mode: 'demo' };
+    return { version: 3,investing:structuredClone(INITIAL_INVESTING),progression:{coins:0,claimed:[],owned:[],coinLog:[]},dialogue:[],ending:{phase:'none',kind:'none',reason:''}, reviews:[],command:{message:'',severity:'info',behavior:'calm',day:0}, life:{...INITIAL_LIFE}, profile, player: { ...profile, position: { x: 6, y: 6, z: 300 }, targetPosition: null, state: 'idle' }, metrics: { health: 100, happiness: 80, cashBalance: profile.income, debtBalance: 0, turn: 1, roomLevel: 1 }, jars: { food: jar('food'), housing: jar('housing'), transit: jar('transit'), leisure: jar('leisure'), utilities: jar('utilities'), savings: jar('savings') }, transactions: [], advisorLog: [{ timestamp: 0, severity: 'info', message: 'A fresh apartment. A fresh start. Give every dollar a place to call home.', actionablePlan: ['Cover your essentials first.', 'Put something aside for future you.'] }], isGameOver: false, housingDeficits: 0, savedTotal: 0, completedMonths: 0, mode: 'demo' };
 }
 export function applyTransactions(state: GameState, transactions: BankTransaction[], authoritativeBalance?: number, origin: 'manual'|'nessie'|'mock'='manual'): GameState {
     if (state.isGameOver)
@@ -83,6 +84,7 @@ export function advanceTurn(state: GameState): GameState {
         return state;
     const s = structuredClone(state);
     s.metrics.turn++;
+    s.investing.today=null;
     s.life.foodStock=clamp(s.life.foodStock-2.4);
     s.life.energy=clamp(s.life.energy+(s.life.foodStock>=25&&s.life.powerOn?1:-1.5));
     if(s.life.foodStock===0)s.metrics.health=clamp(s.metrics.health-2);
@@ -94,6 +96,7 @@ export function advanceTurn(state: GameState): GameState {
     // One turn is a day. Settle a 30-day game month exactly once.
     if ((s.metrics.turn - 1) % DAYS_PER_MONTH !== 0)
         return s;
+    s.investing.accounts=growAccounts(s.investing.accounts);
     const food = s.jars.food;
     s.metrics.health = clamp(s.metrics.health - 15 * Math.max(0, 1 - food.spentAmount / food.minViableSpend));
     const overdrafts = categories.filter(c => s.jars[c].spentAmount > s.jars[c].allocatedAmount + s.jars[c].rolloverAmount).length;

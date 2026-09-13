@@ -390,7 +390,6 @@
         recordTradingSession(c, market, startValue, endValue);
         market = null;
         save();
-        floor.closeDetail();
         endBtn.hidden = true;
         backBtn.hidden = false;
         backBtn.focus();

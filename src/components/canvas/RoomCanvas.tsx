@@ -5,7 +5,7 @@ import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
 import { drawStockBoard } from './StockBoard';
 import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath as routePath, foregroundWalls, roomObjects, placementError, type RoomLayout, type FurnitureId, type RoomObject } from './IsometricEngine';
-export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, onSwipeCharacter, paused=false }: {
+export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, onSwipeCharacter, paused=false, investWalk=false, onArriveInvest }: {
     game: GameState;
     onLayoutChange: (layout:RoomLayout)=>void;
     onInspect: (c: CategoryKey | 'desk') => void;
@@ -14,6 +14,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     /** Swipe (drag) the character sprite itself past a distance threshold — used to trigger visiting another room. */
     onSwipeCharacter?: () => void;
     paused?:boolean;
+    investWalk?:boolean;
+    onArriveInvest?:()=>void;
 }) {
     const [arranging,setArranging]=useState(false);
     const [selected,setSelected]=useState<FurnitureId>('leisure');
@@ -56,9 +58,18 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const inspectCallback=useRef(onInspect);inspectCallback.current=onInspect;
     const pendingInspect=useRef<CategoryKey|'desk'|null>(null);
     const hover=useRef<RoomObject|undefined>(undefined);
+    const investWalkRef=useRef(investWalk);investWalkRef.current=investWalk;
+    const arriveCallback=useRef(onArriveInvest);arriveCallback.current=onArriveInvest;
+    const investArrived=useRef(false);
+    const investFireAt=useRef<number|null>(null);
     current.current = game;
     useEffect(() => { avatar.current = { x: 5, y: 5, z: 300, v: 0 }; path.current = []; }, []);
     useEffect(()=>{const fresh=game.transactions.filter(t=>!seen.current.has(t.id)).reverse();for(const t of fresh)seen.current.add(t.id);queue.current.push(...fresh);},[game.transactions]);
+    useEffect(()=>{
+        if(!investWalk||game.isGameOver)return;
+        investArrived.current=false;investFireAt.current=null;
+        path.current=findPath(avatar.current,{x:0,y:9});activity.current='working';
+    },[investWalk]);
     useEffect(()=>{
         if(game.ending.phase!=='playing')return;
         endingElapsed.current=0;endingNotified.current=false;queue.current=[];
@@ -123,6 +134,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                     a.y += dy / d * Math.min(d, dt * speed);
                 }
             }
+            if(investWalkRef.current&&!investArrived.current&&!path.current.length){investArrived.current=true;investFireAt.current=time+500;}
+            if(investFireAt.current!==null&&time>=investFireAt.current){investFireAt.current=null;arriveCallback.current?.();}
             if (a.z > 0) {
                 a.v += dt * 850;
                 a.z = Math.max(0, a.z - a.v * dt);
@@ -336,7 +349,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
         if(e.button!==0||!e.isPrimary)return;
         e.currentTarget.focus({preventScroll:true});
         const point=pointer(e);
-        if(!arrangeRef.current&&onSwipeCharacterRef.current&&avatarHit(point.x,point.y)){charDrag.current={id:e.pointerId,x:e.clientX};e.currentTarget.setPointerCapture(e.pointerId);return;}
+        if(!arrangeRef.current&&!pauseRef.current&&!investWalkRef.current&&onSwipeCharacterRef.current&&avatarHit(point.x,point.y)){charDrag.current={id:e.pointerId,x:e.clientX};e.currentTarget.setPointerCapture(e.pointerId);return;}
         drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,rotation:requestedCamera.current.rotation,moved:false};e.currentTarget.setPointerCapture(e.pointerId);
     }
     function pointerMove(e:React.PointerEvent<HTMLCanvasElement>){
@@ -344,7 +357,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
         const d=drag.current;if(d&&d.id===e.pointerId){const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;if(d.moved){setRotation(d.rotation+dx/e.currentTarget.getBoundingClientRect().width*360);hover.current=undefined;e.currentTarget.style.cursor='grabbing';}return;}const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'grab';}
     function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){
         const cd=charDrag.current;
-        if(cd&&cd.id===e.pointerId){charDrag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(Math.abs(e.clientX-cd.x)>56&&!launch.current){path.current=[];pendingInspect.current=null;launch.current={t:0};}return;}
+        if(cd&&cd.id===e.pointerId){charDrag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(Math.abs(e.clientX-cd.x)>56&&!launch.current&&!pauseRef.current&&!investWalkRef.current){path.current=[];pendingInspect.current=null;launch.current={t:0};}return;}
         const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved){if(arranging){const point=pointer(e),hit=hitAt(point.x,point.y);if(hit)setSelected(hit.id);else{const tile=unprojectRoom(point.x,point.y,camera.current.angle);moveSelected(tile.gridX,tile.gridY);}}else inspect(e);}}
     function moveSelected(x:number,y:number){
         const error=placementError(objectsRef.current,selected,x,y,avatar.current);

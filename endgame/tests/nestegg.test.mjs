@@ -90,31 +90,35 @@ test('a session deals exactly 6 distinct real stocks and starts at their real op
   assert.ok(run('m.stocks.every(s => { const real = REAL_STOCKS.find(r => r.id === s.id); return s.price === real.prices[0] && s.prices === real.prices; })'));
 });
 
-test('stepMarket replays real recorded prices exactly, one bar per tick', () => {
+test('stepMarket averages BARS_PER_STEP real bars into each on-screen update', () => {
   const run = load();
   run('var m = createMarket(); var s0 = m.stocks[0]; var real = s0.prices;');
-  run('stepMarket(m); stepMarket(m); stepMarket(m);');
-  assert.equal(run('m.stocks[0].price'), run('real[3]'));
-  assert.equal(run('m.stocks[0].idx'), 3);
-  assert.equal(run('m.stocks[0].history.length'), 4); // seed point + 3 steps
-  assert.equal(run('m.stocks[0].history[3].price'), run('real[3]'));
+  run('stepMarket(m);');
+  const expected1 = run('(real[0] + real[1] + real[2] + real[3] + real[4]) / 5');
+  assert.equal(run('m.stocks[0].price'), Math.round(expected1 * 100) / 100);
+  assert.equal(run('m.stocks[0].cursor'), 5);
+  assert.equal(run('m.stocks[0].history.length'), 2); // seed point + 1 step
+  run('stepMarket(m);');
+  const expected2 = run('(real[5] + real[6] + real[7] + real[8] + real[9]) / 5');
+  assert.equal(run('m.stocks[0].price'), Math.round(expected2 * 100) / 100);
+  assert.equal(run('m.stocks[0].cursor'), 10);
 });
 
-test('the market holds its last real price once a stock runs out of history, and reports finished', () => {
+test('the market holds its last averaged price once a stock runs out of history, and reports finished', () => {
   const run = load();
-  run('var m = createMarket(); var bars = m.barCount;');
-  run('for (let i = 0; i < bars - 1; i++) stepMarket(m);');
+  run('var m = createMarket(); var steps = Math.ceil(m.barCount / BARS_PER_STEP);');
+  run('for (let i = 0; i < steps; i++) stepMarket(m);');
   assert.equal(run('marketFinished(m)'), true);
-  const lastPrices = run('m.stocks.map(s => s.prices[s.prices.length - 1])');
-  assert.deepEqual(run('m.stocks.map(s => s.price)'), lastPrices);
+  const pricesAtFinish = run('m.stocks.map(s => s.price)');
   run('stepMarket(m);'); // stepping past the end just holds
-  assert.deepEqual(run('m.stocks.map(s => s.price)'), lastPrices);
+  assert.deepEqual(run('m.stocks.map(s => s.price)'), pricesAtFinish);
 });
 
-test('session duration matches the real history length (1 tick = REAL_TICK_MS)', () => {
+test('session duration matches the real history length at the new pace (1 update = BARS_PER_STEP stock-minutes)', () => {
   const run = load();
   run('var m = createMarket();');
-  assert.equal(run('sessionDurationMs(m)'), run('m.barCount * REAL_TICK_MS'));
+  assert.equal(run('sessionDurationMs(m)'), run('Math.ceil(m.barCount / BARS_PER_STEP) * STEP_MS'));
+  assert.equal(run('sessionDurationMs(m)'), 156000); // 780 bars / 5 per step * 1000ms = 156s, unchanged from before
 });
 
 test('drawYearlyMarketReturn stays within its clamped bounds', () => {

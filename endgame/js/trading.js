@@ -1,6 +1,8 @@
-/* Reusable trading floor UI: topbar, 6-stock sidebar, portfolio + trade
-   history, and fullscreen chart + buy/sell overlay. Used by investing.html
-   (standalone) and career.html (Nest Egg brokerage account).
+/* Reusable trading floor UI: topbar, portfolio summary + trade history, and
+   one card per dealt stock (chart + buy/sell right there, no separate
+   fullscreen view — with only 6 stocks a session, all of them fit on one
+   page). Used by investing.html (standalone) and career.html (Nest Egg
+   brokerage account).
 
    createTradingFloor(root, {
      market,            // from createMarket()
@@ -10,10 +12,9 @@
      onEnd({ startValue, endValue }),
    }) -> { start, end, destroy, addTopbarButton, portfolioValue, isActive }
 
-   The sidebar is built once and updated in place, so live price updates never
+   Cards are built once and updated in place, so live price updates never
    replace a button mid-click. Prices come from real recorded history via
    market.js — there is no synthetic news layer here, on purpose. */
-const MAX_TRADE_LOG = 6;
 const MAX_HISTORY_FEED = 40;
 
 function createTradingFloor(root, options) {
@@ -27,8 +28,8 @@ function createTradingFloor(root, options) {
   const money = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtPct = n => (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
 
-  let active = false, selectedId = null, endAt = 0, startValue = 0;
-  let stepTimer = null, rafId = null, msgTimer = null;
+  let active = false, endAt = 0, startValue = 0;
+  let stepTimer = null, rafId = null;
   const tradeHistory = []; // every trade this session, across all 6 stocks, newest first
 
   root.innerHTML = `
@@ -41,64 +42,27 @@ function createTradingFloor(root, options) {
       <div class="metric"><div class="label">Portfolio</div><div class="val" data-ref="portfolioVal">$0.00</div></div>
       <div class="metric timer" data-ref="timerMetric"><div class="label">Time left</div><div class="val" data-ref="timerVal">--:--</div></div>
     </header>
-    <div class="layout">
-      <aside class="sidebar" data-ref="sidebar"></aside>
-      <main class="browse">
-        <div class="how-card">
-          <b>This is real stock data.</b> These are 6 real companies' actual prices from a recent trading day, replayed faster than real time. Click one to see its chart and trade it. Nothing on this page predicts which way a price is headed — you're watching it happen, same as any trader does.
-        </div>
-        <div class="panels">
-          <div class="portfolio-card">
-            <h2>Your Portfolio</h2>
-            <div class="portfolio-stats">
-              <div class="item"><div class="label">Session start</div><div class="val" data-ref="statStart">$0</div></div>
-              <div class="item"><div class="label">Total value</div><div class="val" data-ref="statTotal">$0</div></div>
-              <div class="item"><div class="label">Session P/L</div><div class="val" data-ref="statGain">$0</div></div>
-            </div>
-            <div class="table-scroll">
-              <table class="holdings-table" data-ref="holdingsTable">
-                <thead><tr><th>Ticker</th><th>Shares</th><th>Avg cost</th><th>Price</th><th>Value</th><th>P/L</th></tr></thead>
-                <tbody data-ref="holdingsBody"></tbody>
-              </table>
-            </div>
-            <div class="holdings-empty" data-ref="holdingsEmpty">No positions yet. Pick a stock on the left to start trading.</div>
-          </div>
-          <div class="history-feed">
-            <h2>Trade History</h2>
-            <div data-ref="historyList"><div class="history-empty">Trades you make this session show up here.</div></div>
-          </div>
-        </div>
-      </main>
-    </div>
-    <div class="detail-overlay" data-ref="detailOverlay">
-      <div class="detail-top">
-        <button class="exit-btn" data-ref="exitDetailBtn">&#8592; Exit</button>
-        <div class="who"><div class="tk" data-ref="detailTicker">—</div><h2 data-ref="detailName">—</h2></div>
-        <div class="price-now"><div class="p" data-ref="detailPrice">$0.00</div><div class="c" data-ref="detailChange">+0.00%</div></div>
+    <main class="browse">
+      <div class="how-card">
+        <b>This is real stock data.</b> These are 6 real companies' actual prices from a recent trading day, replayed slower than real time. Buy or sell any of them right below its chart. Nothing on this page predicts which way a price is headed — you're watching it happen, same as any trader does.
       </div>
-      <div class="detail-body">
-        <div class="chart-wrap"><svg data-ref="detailChart" viewBox="0 0 900 400" preserveAspectRatio="none"></svg></div>
-        <div class="trade-panel">
-          <div class="locked-banner" data-ref="lockedBanner" style="display:none;">Session ended. Trading is locked.</div>
-          <h3>Position</h3>
-          <div class="owned" data-ref="ownedLine">0 shares owned</div>
-          <h3>Trade</h3>
-          <div class="qty-row">
-            <button type="button" data-ref="qtyMinus">−</button>
-            <input type="number" data-ref="qtyInput" value="1" min="1" step="1" aria-label="Quantity"/>
-            <button type="button" data-ref="qtyPlus">+</button>
-            <button type="button" data-ref="qtyMax">MAX</button>
+      <div class="panels">
+        <div class="portfolio-card">
+          <h2>Your Portfolio</h2>
+          <div class="portfolio-stats">
+            <div class="item"><div class="label">Session start</div><div class="val" data-ref="statStart">$0</div></div>
+            <div class="item"><div class="label">Total value</div><div class="val" data-ref="statTotal">$0</div></div>
+            <div class="item"><div class="label">Session P/L</div><div class="val" data-ref="statGain">$0</div></div>
           </div>
-          <div class="trade-buttons">
-            <button class="buy-btn" data-ref="buyBtn">BUY</button>
-            <button class="sell-btn" data-ref="sellBtn">SELL</button>
-          </div>
-          <div class="trade-msg" data-ref="tradeMsg"></div>
-          <h3>Recent trades</h3>
-          <ul class="trade-log" data-ref="tradeLog"><li style="color:var(--muted);">No trades yet</li></ul>
+        </div>
+        <div class="history-feed">
+          <h2>Trade History</h2>
+          <div class="history-list" data-ref="historyList"><div class="history-empty">Trades you make this session show up here.</div></div>
         </div>
       </div>
-    </div>`;
+      <div class="locked-banner" data-ref="lockedBanner" style="display:none;">Session ended. Trading is locked.</div>
+      <div class="stock-grid" data-ref="stockGrid"></div>
+    </main>`;
 
   const ref = {};
   root.querySelectorAll('[data-ref]').forEach(node => { ref[node.dataset.ref] = node; });
@@ -106,27 +70,69 @@ function createTradingFloor(root, options) {
   const changePct = inst => inst.sessionStart ? round2(((inst.price - inst.sessionStart) / inst.sessionStart) * 100) : 0;
   const portfolioValue = () => round2(account.cash + holdingsValue(market, account.holdings));
 
-  // ---------- sidebar (built once, updated in place) ----------
-  const rowRefs = {};
-  function buildSidebar() {
-    ref.sidebar.innerHTML = market.stocks.map(inst => `<button class="stock-row" data-id="${inst.id}">
-      <span class="ticker">${inst.ticker}</span><span class="name">${inst.name}</span>
-      <span class="price" data-part="price"></span><span class="chg flat" data-part="chg"></span></button>`).join('');
-    ref.sidebar.querySelectorAll('.stock-row').forEach(row => {
-      rowRefs[row.dataset.id] = { row, price: row.querySelector('[data-part="price"]'), chg: row.querySelector('[data-part="chg"]') };
-      row.addEventListener('click', () => openDetail(row.dataset.id));
+  // ---------- stock cards (built once, updated in place) ----------
+  const cardRefs = {};
+  function buildStockGrid() {
+    ref.stockGrid.innerHTML = market.stocks.map(inst => `
+      <div class="stock-card" data-id="${inst.id}">
+        <div class="stock-head">
+          <div class="who"><span class="ticker">${inst.ticker}</span><span class="name">${inst.name}</span></div>
+          <div class="price-now"><span class="p" data-part="price">$0.00</span><span class="c" data-part="chg">+0.00%</span></div>
+        </div>
+        <div class="stock-body">
+          <div class="stock-chart"><svg viewBox="0 0 900 300" preserveAspectRatio="none" data-part="chart"></svg></div>
+          <div class="trade-col">
+            <div class="owned-line" data-part="owned">No shares owned</div>
+            <div class="qty-row">
+              <button type="button" data-part="qtyMinus">−</button>
+              <input type="number" data-part="qtyInput" value="1" min="1" step="1" aria-label="${inst.ticker} quantity"/>
+              <button type="button" data-part="qtyPlus">+</button>
+              <button type="button" data-part="qtyMax">MAX</button>
+            </div>
+            <div class="trade-buttons">
+              <button class="buy-btn" data-part="buyBtn">BUY</button>
+              <button class="sell-btn" data-part="sellBtn">SELL</button>
+            </div>
+            <div class="trade-msg" data-part="msg"></div>
+          </div>
+        </div>
+      </div>`).join('');
+
+    ref.stockGrid.querySelectorAll('.stock-card').forEach(card => {
+      const id = card.dataset.id;
+      const part = name => card.querySelector(`[data-part="${name}"]`);
+      const c = { card, price: part('price'), chg: part('chg'), chart: part('chart'), owned: part('owned'), qtyInput: part('qtyInput'), buyBtn: part('buyBtn'), sellBtn: part('sellBtn'), msg: part('msg') };
+      cardRefs[id] = c;
+      part('qtyMinus').addEventListener('click', () => { c.qtyInput.value = Math.max(1, currentQty(id) - 1); });
+      part('qtyPlus').addEventListener('click', () => { c.qtyInput.value = currentQty(id) + 1; });
+      part('qtyMax').addEventListener('click', () => {
+        const inst = marketInstrument(market, id);
+        c.qtyInput.value = Math.max(1, Math.floor(account.cash / inst.price), account.holdings[id] || 0);
+      });
+      c.buyBtn.addEventListener('click', () => buy(id));
+      c.sellBtn.addEventListener('click', () => sell(id));
     });
   }
-  function updateSidebar() {
-    market.stocks.forEach(inst => {
-      const r = rowRefs[inst.id];
-      const chg = changePct(inst);
-      r.price.textContent = '$' + inst.price.toFixed(2);
-      r.chg.textContent = fmtPct(chg);
-      r.chg.className = 'chg ' + (chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat');
-      r.row.classList.toggle('selected', inst.id === selectedId);
-    });
+
+  function updateStockCard(id) {
+    const inst = marketInstrument(market, id), c = cardRefs[id];
+    const chg = changePct(inst);
+    c.price.textContent = '$' + inst.price.toFixed(2);
+    c.chg.textContent = fmtPct(chg);
+    c.chg.style.color = chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--muted)';
+    renderChart(c.chart, inst.history, inst.trades);
+    const owned = account.holdings[id] || 0;
+    if (owned > 0) {
+      const avg = (account.cost[id] || 0) / owned;
+      const pl = round2(owned * inst.price - (account.cost[id] || 0));
+      c.owned.innerHTML = `${owned} share${owned === 1 ? '' : 's'} · avg $${avg.toFixed(2)} · <span style="color:${pl >= 0 ? 'var(--green)' : 'var(--red)'}">${pl >= 0 ? '+' : ''}${money(pl)}</span>`;
+    } else {
+      c.owned.textContent = 'No shares owned';
+    }
+    c.buyBtn.disabled = !active;
+    c.sellBtn.disabled = !active;
   }
+  function updateAllCards() { market.stocks.forEach(inst => updateStockCard(inst.id)); }
 
   // ---------- portfolio / history ----------
   function renderPortfolio() {
@@ -138,18 +144,6 @@ function createTradingFloor(root, options) {
     const gain = round2(total - startValue);
     ref.statGain.textContent = (gain >= 0 ? '+' : '') + money(gain);
     ref.statGain.style.color = gain >= 0 ? 'var(--green)' : 'var(--red)';
-
-    const rows = Object.entries(account.holdings).filter(([, qty]) => qty > 0);
-    ref.holdingsTable.style.display = rows.length ? 'table' : 'none';
-    ref.holdingsEmpty.style.display = rows.length ? 'none' : 'block';
-    ref.holdingsBody.innerHTML = rows.map(([id, qty]) => {
-      const inst = marketInstrument(market, id);
-      if (!inst) return '';
-      const avg = (account.cost[id] || 0) / qty;
-      const pl = round2(qty * inst.price - (account.cost[id] || 0));
-      return `<tr><td>${inst.ticker}</td><td>${qty}</td><td>$${avg.toFixed(2)}</td><td>$${inst.price.toFixed(2)}</td><td>$${(qty * inst.price).toFixed(2)}</td>
-        <td style="color:${pl >= 0 ? 'var(--green)' : 'var(--red)'}">${pl >= 0 ? '+' : ''}${money(pl)}</td></tr>`;
-    }).join('');
   }
 
   function renderHistoryFeed() {
@@ -162,49 +156,17 @@ function createTradingFloor(root, options) {
       </div>`).join('');
   }
 
-  // ---------- detail overlay ----------
-  function openDetail(id) {
-    if (!marketInstrument(market, id)) return;
-    selectedId = id;
-    ref.detailOverlay.classList.add('active');
-    updateSidebar();
-    renderDetail();
-  }
-  function closeDetail() {
-    selectedId = null;
-    ref.detailOverlay.classList.remove('active');
-    updateSidebar();
-  }
-  function renderDetail() {
-    const inst = marketInstrument(market, selectedId);
-    if (!inst) return;
-    ref.detailTicker.textContent = inst.ticker;
-    ref.detailName.textContent = inst.name;
-    ref.detailPrice.textContent = '$' + inst.price.toFixed(2);
-    const chg = changePct(inst);
-    ref.detailChange.textContent = fmtPct(chg) + ' this session';
-    ref.detailChange.style.color = chg > 0 ? 'var(--green)' : chg < 0 ? 'var(--red)' : 'var(--muted)';
-    renderChart(ref.detailChart, inst.history, inst.trades);
-    const owned = account.holdings[inst.id] || 0;
-    ref.ownedLine.textContent = `${owned} share${owned === 1 ? '' : 's'} owned · worth $${(owned * inst.price).toFixed(2)}`;
-    ref.lockedBanner.style.display = active ? 'none' : 'block';
-    ref.buyBtn.disabled = !active;
-    ref.sellBtn.disabled = !active;
-    ref.tradeLog.innerHTML = inst.trades.length
-      ? inst.trades.slice(-MAX_TRADE_LOG).reverse().map(tr => `<li><span class="${tr.type}">${tr.type.toUpperCase()} ${tr.qty}</span><span>@ $${tr.price.toFixed(2)}</span></li>`).join('')
-      : '<li style="color:var(--muted);">No trades yet</li>';
-  }
-
-  function showTradeMsg(text, kind) {
-    ref.tradeMsg.textContent = text;
-    ref.tradeMsg.className = 'trade-msg ' + (kind || '');
-    clearTimeout(msgTimer);
-    msgTimer = setTimeout(() => { ref.tradeMsg.textContent = ''; }, 2600);
+  function showTradeMsg(id, text, kind) {
+    const c = cardRefs[id];
+    c.msg.textContent = text;
+    c.msg.className = 'trade-msg ' + (kind || '');
+    clearTimeout(c.msgTimer);
+    c.msgTimer = setTimeout(() => { c.msg.textContent = ''; }, 2600);
   }
 
   // ---------- trading ----------
-  function currentQty() {
-    const q = Math.floor(Number(ref.qtyInput.value));
+  function currentQty(id) {
+    const q = Math.floor(Number(cardRefs[id].qtyInput.value));
     return Number.isFinite(q) && q > 0 ? q : 1;
   }
   function lastSeq(inst) { return inst.history.length ? inst.history[inst.history.length - 1].seq : 0; }
@@ -213,49 +175,46 @@ function createTradingFloor(root, options) {
     tradeHistory.unshift({ ticker: inst.ticker, type, qty, price });
     if (tradeHistory.length > MAX_HISTORY_FEED) tradeHistory.length = MAX_HISTORY_FEED;
   }
-  function afterTrade() { renderDetail(); renderPortfolio(); renderHistoryFeed(); updateSidebar(); o.onChange(account); }
+  function afterTrade(id) { updateStockCard(id); renderPortfolio(); renderHistoryFeed(); o.onChange(account); }
 
-  function buy() {
-    if (!active) { showTradeMsg('Trading is locked. The session ended.', 'err'); return; }
-    const inst = marketInstrument(market, selectedId);
-    if (!inst) return;
-    const qty = currentQty();
+  function buy(id) {
+    if (!active) { showTradeMsg(id, 'Trading is locked. The session ended.', 'err'); return; }
+    const inst = marketInstrument(market, id);
+    const qty = currentQty(id);
     const cost = round2(qty * inst.price);
-    if (cost > account.cash + 0.001) { showTradeMsg('Not enough cash for that.', 'err'); return; }
+    if (cost > account.cash + 0.001) { showTradeMsg(id, 'Not enough cash for that.', 'err'); return; }
     account.cash = round2(account.cash - cost);
-    account.holdings[inst.id] = (account.holdings[inst.id] || 0) + qty;
-    account.cost[inst.id] = round2((account.cost[inst.id] || 0) + cost);
+    account.holdings[id] = (account.holdings[id] || 0) + qty;
+    account.cost[id] = round2((account.cost[id] || 0) + cost);
     logTrade(inst, 'buy', qty, inst.price);
-    showTradeMsg(`Bought ${qty} ${inst.ticker} @ $${inst.price.toFixed(2)}`, 'ok');
-    afterTrade();
+    showTradeMsg(id, `Bought ${qty} ${inst.ticker} @ $${inst.price.toFixed(2)}`, 'ok');
+    afterTrade(id);
   }
 
-  function sell() {
-    if (!active) { showTradeMsg('Trading is locked. The session ended.', 'err'); return; }
-    const inst = marketInstrument(market, selectedId);
-    if (!inst) return;
-    const qty = currentQty();
-    const owned = account.holdings[inst.id] || 0;
-    if (qty > owned) { showTradeMsg(`You only own ${owned} share${owned === 1 ? '' : 's'}.`, 'err'); return; }
+  function sell(id) {
+    if (!active) { showTradeMsg(id, 'Trading is locked. The session ended.', 'err'); return; }
+    const inst = marketInstrument(market, id);
+    const qty = currentQty(id);
+    const owned = account.holdings[id] || 0;
+    if (qty > owned) { showTradeMsg(id, `You only own ${owned} share${owned === 1 ? '' : 's'}.`, 'err'); return; }
     account.cash = round2(account.cash + qty * inst.price);
     const remaining = owned - qty;
     if (remaining > 0) {
-      account.holdings[inst.id] = remaining;
-      account.cost[inst.id] = round2((account.cost[inst.id] || 0) * remaining / owned);
+      account.holdings[id] = remaining;
+      account.cost[id] = round2((account.cost[id] || 0) * remaining / owned);
     } else {
-      delete account.holdings[inst.id];
-      delete account.cost[inst.id];
+      delete account.holdings[id];
+      delete account.cost[id];
     }
     logTrade(inst, 'sell', qty, inst.price);
-    showTradeMsg(`Sold ${qty} ${inst.ticker} @ $${inst.price.toFixed(2)}`, 'ok');
-    afterTrade();
+    showTradeMsg(id, `Sold ${qty} ${inst.ticker} @ $${inst.price.toFixed(2)}`, 'ok');
+    afterTrade(id);
   }
 
   // ---------- market clock ----------
   function renderLive() {
-    updateSidebar();
+    updateAllCards();
     renderPortfolio();
-    if (selectedId) renderDetail();
   }
 
   function formatClock(ms) {
@@ -286,7 +245,7 @@ function createTradingFloor(root, options) {
       stepMarket(market);
       renderLive();
       if (marketFinished(market)) end();
-    }, REAL_TICK_MS);
+    }, STEP_MS);
     renderLive();
     tickTimer();
   }
@@ -297,19 +256,15 @@ function createTradingFloor(root, options) {
     stopClocks();
     ref.timerVal.textContent = '00:00';
     ref.timerMetric.classList.remove('warn');
+    ref.lockedBanner.style.display = 'block';
     renderLive();
     o.onEnd({ startValue, endValue: portfolioValue() });
-  }
-
-  function onKey(e) {
-    if (e.key === 'Escape' && !e.defaultPrevented && ref.detailOverlay.classList.contains('active')) closeDetail();
   }
 
   function destroy() {
     active = false;
     stopClocks();
-    clearTimeout(msgTimer);
-    document.removeEventListener('keydown', onKey);
+    Object.values(cardRefs).forEach(c => clearTimeout(c.msgTimer));
     root.innerHTML = '';
   }
 
@@ -323,22 +278,9 @@ function createTradingFloor(root, options) {
     return btn;
   }
 
-  // ---------- wire up ----------
-  ref.exitDetailBtn.addEventListener('click', closeDetail);
-  ref.buyBtn.addEventListener('click', buy);
-  ref.sellBtn.addEventListener('click', sell);
-  ref.qtyMinus.addEventListener('click', () => { ref.qtyInput.value = Math.max(1, currentQty() - 1); });
-  ref.qtyPlus.addEventListener('click', () => { ref.qtyInput.value = currentQty() + 1; });
-  ref.qtyMax.addEventListener('click', () => {
-    const inst = marketInstrument(market, selectedId);
-    if (!inst) return;
-    ref.qtyInput.value = Math.max(1, Math.floor(account.cash / inst.price), account.holdings[inst.id] || 0);
-  });
-  document.addEventListener('keydown', onKey);
-
-  buildSidebar();
+  buildStockGrid();
   startValue = portfolioValue();
   renderLive();
 
-  return { start, end, destroy, addTopbarButton, portfolioValue, isActive: () => active, closeDetail };
+  return { start, end, destroy, addTopbarButton, portfolioValue, isActive: () => active };
 }
