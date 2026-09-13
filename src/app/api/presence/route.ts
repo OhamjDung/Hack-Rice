@@ -6,6 +6,11 @@ import { db } from '@/lib/db';
 export async function POST() {
   const userId = await currentUserId();
   if (!userId) return Response.json({ success: false, error: 'Not logged in.' }, { status: 401 });
-  await db().query('INSERT INTO presence (user_id, last_seen) VALUES ($1, now()) ON CONFLICT (user_id) DO UPDATE SET last_seen = now()', [userId]);
-  return Response.json({ success: true, data: null });
+  try {
+    await db().query('INSERT INTO presence (user_id, last_seen) VALUES ($1, now()) ON CONFLICT (user_id) DO UPDATE SET last_seen = now()', [userId]);
+    return Response.json({ success: true, data: null });
+  } catch (e) {
+    console.error(`[presence] DB error for ${userId}:`, e);
+    return Response.json({ success: false, error: 'Could not update presence.' }, { status: 500 });
+  }
 }
