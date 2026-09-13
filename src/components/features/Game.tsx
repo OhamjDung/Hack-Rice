@@ -169,16 +169,20 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
     finally {
         e.target.value = '';
     } }
-    if (visiting) return <div className="game-world visiting-world" data-testid="game-world-visiting">
-      <div className="visit-banner" role="status">Visiting <strong>{visiting.username}</strong>'s room (read-only, live) <button className="button secondary" onClick={()=>setVisiting(null)}>Leave</button></div>
-      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}}/></div>
-    </div>;
     const day=dayOfMonth(game.metrics.turn);
     const warnings=roomConditions(game);
     const encouraged=!game.isGameOver&&game.reviews[0]?.analysis.feedback==='encouragement';
     const isWarning=!encouraged&&(game.command.severity!=='info'||warnings.length>0);
     const thought=game.isGameOver?(game.command.message||'This chapter ends here. Time for a better plan.'):encouraged?game.command.message:game.command.severity!=='info'?game.command.message:warnings[0]||sceneLine||game.command.message||game.life.lastEvent;
     useEffect(()=>{if(ready&&thought)setGame(s=>appendDialogue(s,thought,isWarning?'warning':'action'));},[thought,day,ready,isWarning]);
+    // This early return must come after every hook above — hooks must run in the
+    // same order on every render, and this branch used to sit before the dialogue
+    // useEffect, which crashed React (#300, "rendered fewer hooks than expected")
+    // as soon as a visit actually succeeded.
+    if (visiting) return <div className="game-world visiting-world" data-testid="game-world-visiting">
+      <div className="visit-banner" role="status">Visiting <strong>{visiting.username}</strong>'s room (read-only, live) <button className="button secondary" onClick={()=>setVisiting(null)}>Leave</button></div>
+      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}}/></div>
+    </div>;
     return <div className={`game-world ${!game.life.powerOn?'blackout':''} ${game.life.stress>=35?'stressed':''}`} data-testid="game-world">
       <div className="world-grain" aria-hidden="true"/>
       <header className="game-hud">
