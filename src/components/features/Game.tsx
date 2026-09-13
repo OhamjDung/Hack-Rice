@@ -26,6 +26,7 @@ import { createGame, applyTransactions, advanceTurn, careForHome } from '@/engin
 import { loadGame, saveGame, exportGame } from '@/lib/storage';
 import {importBankDay,bankTransactionsUpdatedToday} from '@/engine/TransactionUpdates';
 import { responseSchema, dailyOutput, syncOutput } from '@/schemas/api';
+import VisitDock from './VisitDock';
 const icons = { food: Utensils, housing: Home, transit: Bus, leisure: Armchair, utilities: Zap, savings: PiggyBank };
 type Dialog = 'transactions-today' | 'monthsummary' | 'forecast' | 'onboard' | 'budget' | 'connect' | 'guide' | 'settings' | 'restart' | 'gameover' | 'journal' | 'events' | 'history' | 'shop' | 'objects' | CategoryKey | 'desk' | null;
 export default function Game({ initialGame }: { initialGame?: GameState }) {
@@ -61,6 +62,35 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
         saveEnabled.current = false;
         setError('Autosave is unavailable. Export your save to keep your progress.');
     } }, [game, ready]);
+    // Best-effort account sync: the DB copy trails localStorage by a debounce tick and
+    // never blocks play if the network/account is unavailable — localStorage stays the floor.
+    const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    useEffect(() => { if (!ready) return; clearTimeout(saveTimer.current); saveTimer.current = setTimeout(() => {
+        fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: game }) }).catch(() => {});
+    }, 800); return () => clearTimeout(saveTimer.current); }, [game, ready]);
+    // Presence heartbeat: lets other accounts' visit requests know this one is online.
+    useEffect(() => { if (!ready) return; const beat = () => { fetch('/api/presence', { method: 'POST' }).catch(() => {}); }; beat(); const id = setInterval(beat, 8000); return () => clearInterval(id); }, [ready]);
+    const [visiting, setVisiting] = useState<{ username: string; state: GameState } | null>(null);
+    const [visitDialogOpen, setVisitDialogOpen] = useState(false);
+    const [visitError, setVisitError] = useState('');
+    async function goVisit(username: string) {
+        setVisitError('');
+        try {
+            const res = await fetch(`/api/visit/${encodeURIComponent(username)}`);
+            const value = await res.json();
+            if (!res.ok || !value.success) throw new Error(value.error || 'Could not visit that room.');
+            setVisiting({ username: value.data.username, state: value.data.state });
+            setVisitDialogOpen(false);
+        } catch (e) { setVisitError(e instanceof Error ? e.message : 'Could not visit that room.'); }
+    }
+    useEffect(() => { if (!visiting) return; const id = setInterval(async () => {
+        try {
+            const res = await fetch(`/api/visit/${encodeURIComponent(visiting.username)}`);
+            const value = await res.json();
+            if (!res.ok || !value.success) { setVisiting(null); return; }
+            setVisiting({ username: value.data.username, state: value.data.state });
+        } catch { setVisiting(null); }
+    }, 3000); return () => clearInterval(id); }, [visiting?.username]);
     useEffect(() => { if (game.isGameOver&&game.ending.phase!=='playing'&&!busy)
         setDialog('gameover'); }, [game.isGameOver,game.ending.phase,busy]);
     async function request<T>(job: () => Promise<T>) { if (lock.current)
@@ -134,6 +164,10 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
     finally {
         e.target.value = '';
     } }
+    if (visiting) return <div className="game-world visiting-world" data-testid="game-world-visiting">
+      <div className="visit-banner" role="status">Visiting <strong>{visiting.username}</strong>'s room (read-only, live) <button className="button secondary" onClick={()=>setVisiting(null)}>Leave</button></div>
+      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}} paused/></div>
+    </div>;
     const day=dayOfMonth(game.metrics.turn);
     const warnings=roomConditions(game);
     const encouraged=!game.isGameOver&&game.reviews[0]?.analysis.feedback==='encouragement';
@@ -178,8 +212,10 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
       {dialog==='journal'&&<Modal title="The story behind your days" onClose={()=>setDialog(null)}><p className="muted">These are the moments your character is living. Every transaction leaves a little trace at home.</p><TransactionFeed transactions={game.transactions} expanded={expanded} onExpand={()=>setExpanded(v=>!v)}/><div className="journal-balance"><span>In your pocket</span><strong>{money(game.metrics.cashBalance)}</strong></div><button className="button secondary full-width" onClick={()=>setDialog('budget')}>Open the budget notebook</button></Modal>}
       {dialog==='objects'&&<Modal title="Everything here has a story" onClose={()=>setDialog(null)}><div className="room-object-grid">{categories.map(c=>{const Icon=icons[c];return <button key={c} onClick={()=>setDialog(c)}><Icon size={27}/><strong>{({food:'The fridge',housing:'Your bed',leisure:'The sofa',utilities:'The lights',transit:'Your keys',savings:'The little ledger'})[c]}</strong></button>;})}<button onClick={()=>setDialog('desk')}><BookOpen size={27}/><strong>Your work desk</strong></button></div></Modal>}
  {(dialog === 'onboard' || dialog === 'budget') && <OnboardingModal profile={dialog === 'budget' ? game.profile : undefined} onStart={start} onClose={() => setDialog(null)}/>} {dialog && ([...categories, 'desk'] as string[]).includes(dialog) && <InspectModal category={dialog as CategoryKey | 'desk'} game={game} onClose={() => setDialog(null)} onPurchase={addTransaction} busy={busy||game.isGameOver} error={error} onCare={action=>{setSceneLine('');setGame(s=>careForHome(s,action));setDialog(null);}}/>}{dialog === 'connect' && <AuthModal onClose={() => setDialog(null)} onConnect={()=>sync()} busy={busy} error={error}/>}{dialog === 'gameover' && <GameOverModal game={game} onClose={() => setDialog(null)} onRestart={() => setDialog('onboard')} onRewind={() => { epoch.current++; setGame(s => rewindRun(s)); setRun(r => r + 1); setSceneLine(''); setDialog(null); setNotice('Back before the risky purchase. Choose your next action again.'); }}/>}
- {dialog === 'settings' && <Modal title="Make it your own" onClose={() => setDialog(null)}><p className="muted">Your progress is saved in this browser. Export a copy to take your apartment with you.</p><div className="settings-actions"><button className="button secondary" onClick={()=>sync()}><Landmark size={17}/>Update today's transactions</button><button className="button secondary" onClick={() => exportGame(game)}><Download size={17}/>Export save</button><button className="button secondary" onClick={() => fileRef.current?.click()}><Upload size={17}/>Import save</button><button className="button secondary" onClick={() => setDialog('restart')}><RotateCcw size={17}/>Start a new run</button></div></Modal>}
+ {dialog === 'settings' && <Modal title="Make it your own" onClose={() => setDialog(null)}><p className="muted">Your progress is saved to your account and follows you to any device you log into.</p><div className="settings-actions"><button className="button secondary" onClick={()=>sync()}><Landmark size={17}/>Update today's transactions</button><button className="button secondary" onClick={() => exportGame(game)}><Download size={17}/>Export save</button><button className="button secondary" onClick={() => fileRef.current?.click()}><Upload size={17}/>Import save</button><button className="button secondary" onClick={() => setDialog('restart')}><RotateCcw size={17}/>Start a new run</button><button className="button secondary" onClick={() => fetch('/api/auth/logout',{method:'POST'}).then(()=>{window.location.href='/';})}>Log out</button></div></Modal>}
  {dialog === 'restart' && <Modal title="Ready for a fresh start?" onClose={() => setDialog(null)}><p>Your current autosave will be replaced when you move into the new apartment. Export it first if you would like to keep it.</p><div className="modal-actions"><button className="button secondary" onClick={() => exportGame(game)}>Export current run</button><button className="button primary" onClick={() => setDialog('onboard')}>Create new run<ArrowRight size={16}/></button></div></Modal>}
  {dialog === 'guide' && <Modal title="Tutorial" onClose={() => setDialog(null)}><ol className="guide-list"><li><strong>Live in the room.</strong><p>Click the floor to walk, or click furniture to interact. Room buttons offer the same actions with a keyboard.</p></li><li><strong>Let money become moments.</strong><p>Use the right-side actions for groceries, shopping, rent, and bills. Savings, gym, and health missions require transaction updates and award furniture coins. Risky optional spending can cost coins at End day. Transaction updates match the current day of the month. Each day can be updated once; skipped days are not imported automatically. End day advances the calendar. Your character acts out new transactions in order.</p></li><li><strong>Time has consequences.</strong><p>End day uses food and reviews yesterday's spending. Empty supplies damage health; low energy slows your character. At month end, unpaid power goes dark and missed rent leaves a notice. Two missed rent months end the run.</p></li><li><strong>Recover through choices.</strong><p>Groceries replenish food. Rest in bed once per day to restore energy and heal a little if fed. Tidy the sofa area to reduce clutter and stress. Pay utilities to restore light. Tidying does not pay your bills.</p></li><li><strong>Keep the numbers tucked away.</strong><p>The journal contains your transactions and budget notebook. Profile opens your character and budget. History keeps past dialogue. The menu contains transaction updates and saves.</p></li></ol><button className="button secondary full-width" onClick={()=>setDialog('objects')}>Explore the room items</button><button className="button primary full-width" onClick={() => setDialog(null)}>Got it. Let’s build a life.</button></Modal>}
+ <VisitDock onSwipe={()=>{setVisitError('');setVisitDialogOpen(true);}}/>
+ {visitDialogOpen && <Modal title="Visit a friend" onClose={()=>setVisitDialogOpen(false)}><p className="muted">Enter their username. They need to have CashBound open right now to be visited.</p><form onSubmit={e=>{e.preventDefault();const input=(e.currentTarget.elements.namedItem('username') as HTMLInputElement).value.trim();if(input)void goVisit(input);}}><label>Username<input name="username" autoFocus/></label>{visitError&&<p className="error" role="alert">{visitError}</p>}<div className="modal-actions"><button type="submit" className="button primary">Visit<ArrowRight size={16}/></button></div></form></Modal>}
  <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Import saved game" onChange={importSave}/></div>;
 }

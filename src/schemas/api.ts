@@ -10,3 +10,9 @@ export const adviceInput = z.object({ state: stateSchema, kind: z.enum(['breach'
 export const mockInput = z.object({ turn: z.number().int().positive(), index: z.number().int().min(0), category: categorySchema, amount: z.number().positive().max(100000) });
 export const syncOutput = z.object({ balance: z.number().finite(), transactions: z.array(transactionSchema), accountName: z.string() });
 export const responseSchema = <T extends z.ZodType>(data: T) => z.object({ success: z.literal(true), data, source: z.enum(['gemini', 'fallback', 'nessie', 'demo']).optional() });
+
+export const usernameSchema = z.string().trim().min(3).max(24).regex(/^[a-zA-Z0-9_]+$/, 'Letters, numbers, and underscores only.');
+export const passwordSchema = z.string().min(6).max(200);
+export const signupInput = z.object({ username: usernameSchema, password: passwordSchema, initialState: stateSchema });
+export const loginInput = z.object({ username: usernameSchema, password: passwordSchema });
+export const gameSaveInput = z.object({ state: stateSchema });

@@ -1,0 +1,16 @@
+import { cookies } from 'next/headers';
+import { loginInput } from '@/schemas/api';
+import { verifyPassword } from '@/lib/password';
+import { createSessionToken, SESSION_COOKIE } from '@/lib/session';
+import { db } from '@/lib/db';
+
+export async function POST(req: Request) {
+  const input = loginInput.safeParse(await req.json().catch(() => null));
+  if (!input.success) return Response.json({ success: false, error: 'Enter your username and password.' }, { status: 400 });
+  const { username, password } = input.data;
+  const result = await db().query<{ id: string; password_hash: string }>('SELECT id, password_hash FROM users WHERE username = $1', [username]);
+  const user = result.rows[0];
+  if (!user || !(await verifyPassword(password, user.password_hash))) return Response.json({ success: false, error: 'Incorrect username or password.' }, { status: 401 });
+  (await cookies()).set(SESSION_COOKIE, createSessionToken(user.id), { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 60 * 60 * 24 * 90 });
+  return Response.json({ success: true, data: { username } });
+}

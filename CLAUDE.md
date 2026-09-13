@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
-## RoomEconomy
+## CashBound (main app)
 
-A financial life simulation game (Next.js 16 / React 19 App Router). The room is the play space: budgets, transactions, and settings are optional dialogs layered over a persistent isometric apartment view. See `README.md` for full gameplay rules (day loop, missions, Nessie sync, endings) — don't duplicate that here.
+A financial life simulation game (Next.js 16 / React 19 App Router), internally called RoomEconomy in source (`room-economy-v1` storage key, `RoomEconomy` in some file headers) but shipped as **CashBound** — this is the main app, the one deployed to Vercel. The room is the play space: budgets, transactions, and settings are optional dialogs layered over a persistent isometric apartment view. See `README.md` for full gameplay rules (day loop, missions, Nessie sync, endings) — don't duplicate that here.
 
 ### Commands
 
