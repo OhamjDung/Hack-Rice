@@ -96,10 +96,6 @@
 .game-world .scene-controls .camera-action:disabled{opacity:.45;cursor:default}
 .game-world .room-scene{min-width:0}
 
-.visit-dock{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:9px 14px;background:#344238;border:1px solid #68785f;border-radius:20px;color:#edf2e7;font-size:12px;cursor:grab;touch-action:pan-y;user-select:none;z-index:3}
-.visit-dock:active{cursor:grabbing}
-.visit-dock:focus-visible{outline:2px solid #e7dca0;outline-offset:2px}
-@media(max-width:650px){.visit-dock{bottom:150px}}
 .visiting-world .visit-banner{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:center;gap:14px;padding:14px;background:#344238;color:#f5f1e7;border-bottom:1px solid #68785f}
 .visiting-world .world-stage{position:absolute;inset:65px 0 0}
 @media(max-width:650px){.visit-banner{flex-wrap:wrap;text-align:center;padding:10px}}
