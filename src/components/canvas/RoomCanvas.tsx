@@ -3,14 +3,30 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameState, CategoryKey, BankTransaction, PlayerCharacter } from '@/engine/Types';
 import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
-import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath, foregroundWalls } from './IsometricEngine';
-export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, paused=false }: {
+import { drawStockBoard } from './StockBoard';
+import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath as routePath, foregroundWalls, roomObjects, placementError, type RoomLayout, type FurnitureId, type RoomObject } from './IsometricEngine';
+export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, paused=false }: {
     game: GameState;
+    onLayoutChange: (layout:RoomLayout)=>void;
     onInspect: (c: CategoryKey | 'desk') => void;
     onScene?: (line:string)=>void;
     onEndingComplete?:()=>void;
     paused?:boolean;
 }) {
+    const [arranging,setArranging]=useState(false);
+    const [selected,setSelected]=useState<FurnitureId>('leisure');
+    const [layoutMessage,setLayoutMessage]=useState('Choose furniture, then click a floor tile or use the move buttons.');
+    const arrangeRef=useRef(arranging);arrangeRef.current=arranging;
+    const selectionRef=useRef(selected);selectionRef.current=selected;
+    const objectsRef=useRef(roomObjects(game.roomLayout));objectsRef.current=roomObjects(game.roomLayout);
+    function findPath(start:{x:number;y:number},goal:{x:number;y:number}){
+        let target=goal;
+        if(!objectsRef.current.includes(goal as RoomObject)){
+            const id=goal.x===8&&goal.y===2?'housing':goal.x===2&&goal.y===2?'food':goal.x===6&&goal.y===9?'leisure':undefined;
+            if(id)target=objectsRef.current.find(o=>o.id===id)!;
+        }
+        return routePath(start,target,objectsRef.current);
+    }
     const ref = useRef<HTMLCanvasElement>(null);
     const current = useRef(game);
     const pauseRef=useRef(paused);pauseRef.current=paused;
@@ -34,7 +50,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const drag=useRef<{id:number;x:number;y:number;rotation:number;moved:boolean}|null>(null);
     const inspectCallback=useRef(onInspect);inspectCallback.current=onInspect;
     const pendingInspect=useRef<CategoryKey|'desk'|null>(null);
-    const hover=useRef<typeof OBJECTS[number]|undefined>(undefined);
+    const hover=useRef<RoomObject|undefined>(undefined);
     current.current = game;
     useEffect(() => { avatar.current = { x: 5, y: 5, z: 300, v: 0 }; path.current = []; }, []);
     useEffect(()=>{const fresh=game.transactions.filter(t=>!seen.current.has(t.id)).reverse();for(const t of fresh)seen.current.add(t.id);queue.current.push(...fresh);},[game.transactions]);
@@ -57,9 +73,10 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
         const ctx = canvas.getContext('2d');
         if (!ctx)
             return;
-        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
         let frame = 0, last = 0;
         const draw = (time: number) => {
+            const reduced = motionQuery.matches;
             const dt = Math.min((time - last) / 1000, .04);
             last = time;
             const g = current.current;
@@ -77,28 +94,29 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 }
             }
             if(pendingInspect.current&&!path.current.length&&!g.isGameOver){const item=pendingInspect.current;pendingInspect.current=null;inspectCallback.current(item);}
-            if(!pendingInspect.current&&!path.current.length&&time>sceneUntil.current&&!g.isGameOver){
+            if(!arrangeRef.current&&!pendingInspect.current&&!path.current.length&&time>sceneUntil.current&&!g.isGameOver){
                 const event=queue.current.shift();
-                if(event){const scene=transactionScene(event);path.current=findPath(a,scene.target);activity.current=scene.activity;sceneUntil.current=time+7000;sceneCallback.current?.(scene.line);nextWander.current=time+10000;}
+                if(event){const scene=transactionScene(event);path.current=findPath(a,objectsRef.current.find(o=>o.id===event.category)||scene.target);activity.current=scene.activity;sceneUntil.current=time+7000;sceneCallback.current?.(scene.line);nextWander.current=time+10000;}
                 else if(time>nextWander.current){const warning=g.command.severity!=='info';const target=warning?(g.command.behavior==='tired'?{x:8,y:2}:Math.floor(time/5000)%2?{x:8,y:2}:{x:5,y:4}):g.life.foodStock<25?{x:2,y:2}:g.life.energy<30?{x:8,y:2}:g.life.stress>=35?{x:8,y:2}:[{x:5,y:4},{x:6,y:9},{x:8,y:2}][Math.floor(time/10000)%3];path.current=findPath(a,target);activity.current=warning?(g.command.behavior==='tired'?'sleeping':'worried'):g.life.energy<30?'sleeping':'idle';nextWander.current=time+(warning?10000:18000);}
             }
             const target = path.current[0];
-            if (target) {
+            if (target && a.z === 0) {
                 const dx = target.x - a.x, dy = target.y - a.y, d = Math.hypot(dx, dy);
-                if (reduced || d < .08) {
+                // Reduced motion removes decorative effects, never walking time.
+                if (d < .08) {
                     a.x = target.x;
                     a.y = target.y;
                     path.current.shift();
                 }
                 else {
-                    const speed=g.life.energy<30?.3:.7;
+                    const speed=g.life.energy<30?3.6:7.2;
                     a.x += dx / d * Math.min(d, dt * speed);
                     a.y += dy / d * Math.min(d, dt * speed);
                 }
             }
             if (a.z > 0) {
                 a.v += dt * 850;
-                a.z = reduced ? 0 : Math.max(0, a.z - a.v * dt);
+                a.z = Math.max(0, a.z - a.v * dt);
             }
             // Render the original smooth room at the display resolution.
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -112,7 +130,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             ctx.translate(ROOM_VIEW.width/2, ROOM_VIEW.height/2);
             ctx.scale(camera.current.zoom, camera.current.zoom);
             ctx.translate(-360, -285);
-            const p = (x: number, y: number, z = 0) => { const t = projectRoom(x, y, angle); return [Math.round(t.screenX), Math.round(t.screenY - z)] as const; };
+            const p = (x: number, y: number, z = 0) => { const t = projectRoom(x,y,angle); return [Math.round(t.screenX),Math.round(t.screenY-z)] as const; };
             const poly = (points: readonly (readonly number[])[], fill: string, stroke?: string) => { ctx.beginPath(); points.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1])); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); if (stroke) {
                 ctx.strokeStyle = stroke;
                 ctx.lineWidth = .7;
@@ -155,17 +173,24 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 poly([p(8.4,0,64),p(8.8,0,71),p(9.2,0,63),p(9.5,0,69),p(9.7,0,62),p(9.7,0,53),p(8.4,0,53)],'#718266');
                 for(const [wx,wz] of [[8.7,64],[9.1,68],[9.35,62]])poly([p(wx,0,wz),p(wx+.18,0,wz),p(wx+.18,0,55),p(wx,0,55)],'#ad8054');
             }
+            if(!nearWalls.includes('x'))drawStockBoard(ctx,p(0.02,11,103),p(0.02,5,103),p(0.02,11,56),g.metrics.turn,g.life.powerOn);
             // Rug and furniture, in back-to-front order.
             poly([p(5.9, 5.3), p(10, 5.3), p(10, 11), p(5.9, 11)], '#607e66');
             poly([p(6.15, 5.55), p(9.75, 5.55), p(9.75, 10.75), p(6.15, 10.75)], g.progression.owned.includes('rug')?'#c58665':'#a3b183');
+            const furniture=(id:FurnitureId,draw:()=>void)=>{
+                const moved=objectsRef.current.find(o=>o.id===id)!;
+                const original=OBJECTS.find(o=>o.id===id)!;
+                const from=projectRoom(original.x,original.y,angle),to=projectRoom(moved.x,moved.y,angle);
+                renderQueue.push({depth:depth(moved.x+moved.w/2,moved.y+moved.d/2),draw:()=>{ctx.save();ctx.translate(to.screenX-from.screenX,to.screenY-from.screenY);draw();ctx.restore();}});
+            };
             furnitureMode=true;
-            renderQueue.push({depth:depth(0.6,2),draw:()=>{
+            furniture('food',()=>{
             box(0, 1.4, 1.2, 1.2, 68, '#eceaf0', '#cecad5', '#aaa6b5');
             box(1.21, 1.9, .04, .12, 17, '#7d8879', '#7d8879', '#7d8879', 20);
             poly([p(1.21,1.4,44),p(1.21,2.6,44),p(1.21,2.6,42),p(1.21,1.4,42)],'#8b8179');
             poly([p(0,2.61,44),p(1.2,2.61,44),p(1.2,2.61,42),p(0,2.61,42)],'#8b8179');
-            }});
-            renderQueue.push({depth:depth(0.6,4.2),draw:()=>{
+            });
+            furniture('utilities',()=>{
             box(0, 3, 1.2, 2.4, 34, '#ece9dc', '#c5b496', '#b19b7e');
             box(0.2, 3.3, .7, .8, 2, '#929f9a', '#929f9a', '#929f9a', 34);
             box(0.2, 4.45, .7, .7, 2, '#444e46', '#444e46', '#444e46', 34);
@@ -173,8 +198,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             box(1.21,4.5,.03,.65,18,'#60544d','#453f40','#453f40',8);
             box(1.24,4.57,.04,.5,2,'#d2c7b1','#d2c7b1','#d2c7b1',26);
             for(const x of [.3,.65])for(const y of [4.55,4.85])box(x,y,.22,.2,1,'#77747d','#4b474e','#4b474e',36);
-            }});
-            renderQueue.push({depth:depth(2,7.7),draw:()=>{
+            });
+            furniture('desk',()=>{
             for(const x of [1.08,2.72])for(const y of [7.08,8.12])box(x,y,.16,.16,34,'#bb946b','#9a7757','#86674d');
             box(1, 7, 2, 1.4, 4, '#bb946b', '#9a7757', '#86674d',34);
 
@@ -185,16 +210,16 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             box(1.8,7.93,.75,.32,2,'#ded9d2','#a9a4a1','#969094',38);
             for(let row=0;row<3;row++)for(let col=0;col<7;col++)box(1.83+col*.095,7.95+row*.09,.06,.055,.4,'#aaa6a7','#aaa6a7','#aaa6a7',40);
             box(2.66,7.9,.18,.25,3,'#aba6a5','#918b8a','#797477',38);
-            }});
-            renderQueue.push({depth:depth(10.3,2.5),draw:()=>{
+            });
+            furniture('housing',()=>{
             box(9, 1, 2.6, 3, 17, '#b7784d', '#955b3e', '#794832');
             box(9, 1, 2.6, .25, 46, '#b5784c', '#995d3c', '#774731');
             box(9.1, 1.3, 2.4, 2.6, 11, '#f7f0df', '#e2d9c5', '#c9c2ae', 17);
             box(9.1, 2.2, 2.4, 1.7, 5, '#ca7853', '#b86346', '#9b4e3c', 28);
             for(const px of [9.3,10.4])box(px,1.45,.85,.6,6,'#f5d7af','#dbb68f','#bd9878',28);
             box(9.12,1.04,2.36,.08,3,'#dd9b66','#dd9b66','#dd9b66',39);
-            }});
-            renderQueue.push({depth:depth(7.9,6.7),draw:()=>{
+            });
+            furniture('leisure',()=>{
                 // Solid base, then depth-sorted upholstery: the back/arms hide
                 // cushions correctly from every side of the rotating camera.
                 for(const x of [6.65,8.95])for(const y of [6.12,7.17])
@@ -209,19 +234,19 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 ];
                 pieces.sort((a,b)=>depth(a.x+a.w/2,a.y+a.d/2)-depth(b.x+b.w/2,b.y+b.d/2));
                 for(const s of pieces)box(s.x,s.y,s.w,s.d,s.h,s.top,s.left,s.right,s.base);
-            }});
-            renderQueue.push({depth:depth(7.9,8.6),draw:()=>{
+            });
+            furniture('savings',()=>{
             for(const tx of [7.28,8.38])for(const ty of [8.18,8.92])box(tx,ty,.14,.14,18,'#bd8052','#945a38','#794830');
             box(7.2,8.1,1.4,1,4,'#c68a57','#a86a41','#875033',18);
             box(7.45, 8.3, .55, .4, 3, '#e7e1c6', '#c7c5ac', '#b7b59c', 22);
-            }});
-            renderQueue.push({depth:depth(6.5,11.25),draw:()=>{
+            });
+            furniture('transit',()=>{
                 box(6, 11, 1, .5, 25, '#b59776', '#987a5a', '#86694e');
                 const [kx,ky]=p(6.45,11.25,29);
                 ctx.save();ctx.strokeStyle='#72501d';ctx.lineWidth=7;ctx.lineCap='round';
                 const key=()=>{ctx.beginPath();ctx.arc(kx-7,ky-3,6,0,Math.PI*2);ctx.moveTo(kx-1,ky-3);ctx.lineTo(kx+15,ky-3);ctx.moveTo(kx+10,ky-3);ctx.lineTo(kx+10,ky+3);ctx.moveTo(kx+15,ky-3);ctx.lineTo(kx+15,ky+2);ctx.stroke();};
                 key();ctx.strokeStyle='#f3d56e';ctx.lineWidth=3;key();ctx.restore();
-            }});
+            });
             const plant=(x:number,y:number)=>{
                 if(!drawing){renderQueue.push({depth:depth(x+.32,y+.32),draw:()=>plant(x,y)});return;}
                 const [px,py]=p(x+.32,y+.32);
@@ -248,6 +273,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             }});
             for(let i=0;i<g.life.clutter;i++){const x=7+(i%3)*.7,y=9+Math.floor(i/3)*.5;box(x,y,.45,.4,9,'#cda777','#aa835c','#946c48');}
             drawing=true;renderQueue.sort((a,b)=>a.depth-b.depth).forEach(item=>item.draw());furnitureMode=false;
+            if(arrangeRef.current){const o=objectsRef.current.find(o=>o.id===selectionRef.current)!;poly([p(o.x,o.y),p(o.x+o.w,o.y),p(o.x+o.w,o.y+o.d),p(o.x,o.y+o.d)],'rgba(231,220,160,.35)','#ffe7a2');}
             if(hover.current&&!g.isGameOver){const o=hover.current;poly([p(o.x,o.y),p(o.x+o.w,o.y),p(o.x+o.w,o.y+o.d),p(o.x,o.y+o.d)],'rgba(231,220,160,.2)','#ead69c');}
             if (!target && activity.current !== 'idle' && a.z === 0) {
                 ctx.font = '10px sans-serif';
@@ -261,16 +287,16 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 ctx.fillText(caption, pos[0] - width / 2, pos[1] - 69);
             }
             if (g.housingDeficits||g.ending.kind==='eviction') {
-                const [x, y] = p(9, 1, 56);
+                const bed=objectsRef.current.find(o=>o.id==='housing')!;const [x, y] = p(bed.x, bed.y, 56);
                 ctx.fillStyle = '#fff0da';
                 ctx.fillRect(x - 22, y - 12, 44, 22);
                 ctx.fillStyle = '#ab493c';
                 ctx.font = 'bold 8px sans-serif';
                 ctx.fillText('RENT DUE', x - 19, y + 2);
             }
-            if(g.life.stress>=15){for(let i=0;i<3;i++)box(1+i*.3,7.8,.4,.35,1,'#f7e5d4','#d9b7a1','#d9b7a1',39+i);}
+            if(g.life.stress>=15){const desk=objectsRef.current.find(o=>o.id==='desk')!;for(let i=0;i<3;i++)box(desk.x+i*.3,desk.y+.8,.4,.35,1,'#f7e5d4','#d9b7a1','#d9b7a1',39+i);}
             if (g.life.foodStock < 25||g.ending.kind==='food_shortage') {
-                const [x, y] = p(1, 1.4, 74);
+                const fridge=objectsRef.current.find(o=>o.id==='food')!;const [x, y] = p(fridge.x+1, fridge.y, 74);
                 ctx.fillStyle = '#77573c';
                 ctx.font = '11px sans-serif';
                 ctx.fillText('Empty', x - 12, y);
@@ -290,11 +316,19 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
         return () => cancelAnimationFrame(frame);
     }, []);
     function pointer(e:React.PointerEvent<HTMLCanvasElement>){const r=e.currentTarget.getBoundingClientRect(),z=camera.current.zoom;return {x:((e.clientX-r.left)/r.width*ROOM_VIEW.width-ROOM_VIEW.width/2)/z+360,y:((e.clientY-r.top)/r.height*ROOM_VIEW.height-ROOM_VIEW.height/2)/z+285};}
-    function hitAt(x:number,y:number){return [...OBJECTS].sort((a,b)=>projectRoom(b.x,b.y,camera.current.angle).screenY-projectRoom(a.x,a.y,camera.current.angle).screenY).find(o=>{const p=projectRoom(o.x+o.w/2,o.y+o.d/2,camera.current.angle);return Math.abs(x-p.screenX)<34&&y>p.screenY-65&&y<p.screenY+12;});}
+    function hitAt(x:number,y:number){return [...objectsRef.current].sort((a,b)=>projectRoom(b.x,b.y,camera.current.angle).screenY-projectRoom(a.x,a.y,camera.current.angle).screenY).find(o=>{const p=projectRoom(o.x+o.w/2,o.y+o.d/2,camera.current.angle);return Math.abs(x-p.screenX)<34&&y>p.screenY-65&&y<p.screenY+12;});}
     function inspect(e:React.PointerEvent<HTMLCanvasElement>){if(current.current.isGameOver)return;const {x,y}=pointer(e);const hit=hitAt(x,y);pendingInspect.current=hit?.id??null;const p=unprojectRoom(x,y,camera.current.angle);path.current=findPath(avatar.current,hit||{x:p.gridX,y:p.gridY});nextWander.current=performance.now()+10000;}
     function pointerDown(e:React.PointerEvent<HTMLCanvasElement>){if(e.button!==0||!e.isPrimary)return;e.currentTarget.focus({preventScroll:true});drag.current={id:e.pointerId,x:e.clientX,y:e.clientY,rotation:requestedCamera.current.rotation,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}
     function pointerMove(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(d&&d.id===e.pointerId){const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;if(d.moved){setRotation(d.rotation+dx/e.currentTarget.getBoundingClientRect().width*360);hover.current=undefined;e.currentTarget.style.cursor='grabbing';}return;}const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'grab';}
-    function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved)inspect(e);}
+    function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved){if(arranging){const point=pointer(e),hit=hitAt(point.x,point.y);if(hit)setSelected(hit.id);else{const tile=unprojectRoom(point.x,point.y,camera.current.angle);moveSelected(tile.gridX,tile.gridY);}}else inspect(e);}}
+    function moveSelected(x:number,y:number){
+        const error=placementError(objectsRef.current,selected,x,y,avatar.current);
+        if(error){setLayoutMessage(error);return;}
+        path.current=[];pendingInspect.current=null;hover.current=undefined;
+        onLayoutChange({...game.roomLayout,[selected]:{x,y}});
+        setLayoutMessage('Layout saved. Choose another item or select Done.');
+    }
+    function nudge(dx:number,dy:number){const o=objectsRef.current.find(o=>o.id===selected)!;moveSelected(Math.round((o.x+dx)*10)/10,Math.round((o.y+dy)*10)/10);}
     function cancelDrag(){drag.current=null;}
-    return <div className="room-scene"><canvas ref={ref} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag} onPointerLeave={()=>{hover.current=undefined;}} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setRotation(r=>r+(e.key==='ArrowLeft'?-15:15));}if(e.key==='Home'){e.preventDefault();setRotation(0);}}} tabIndex={0} aria-label="Apartment. Hold and drag to rotate; click furniture to interact. Arrow keys rotate; Home resets." aria-keyshortcuts="ArrowLeft ArrowRight Home" role="img"/><div className="scene-controls" aria-label="Room camera"><span className="camera-hint">Drag to turn</span><output aria-label="Room angle">{Math.round(((rotation%360)+360)%360)}°</output><button aria-label="Reset room view" onClick={()=>{setRotation(0);setZoom(1.1);}}>Reset</button><button aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(.8,Math.round((z-.1)*10)/10))} disabled={zoom<=.8}>−</button><span>{Math.round(zoom*100)}%</span><button aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(ROOM_VIEW.maxZoom,Math.round((z+.1)*10)/10))} disabled={zoom>=ROOM_VIEW.maxZoom}>+</button></div></div>;
+    return <div className="room-scene"><canvas ref={ref} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelDrag} onLostPointerCapture={cancelDrag} onPointerLeave={()=>{hover.current=undefined;}} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setRotation(r=>r+(e.key==='ArrowLeft'?-15:15));}if(e.key==='Home'){e.preventDefault();setRotation(0);}}} tabIndex={0} aria-label="Apartment with a simulated stock board on the wall. Hold and drag to rotate; click furniture to interact. Arrow keys rotate; Home resets." aria-keyshortcuts="ArrowLeft ArrowRight Home" role="img"/><div className="scene-controls" aria-label="Room camera"><button className="camera-action" aria-pressed={arranging} disabled={game.isGameOver} onClick={()=>{setArranging(v=>!v);path.current=[];pendingInspect.current=null;}}> {arranging?'Done':'Arrange furniture'}</button><output aria-label="Room angle">{Math.round(((rotation%360)+360)%360)}°</output><button className="camera-action" aria-label="Reset room view" onClick={()=>{setRotation(0);setZoom(1.1);}}>Reset</button><button aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(.8,Math.round((z-.1)*10)/10))} disabled={zoom<=.8}>−</button><span>{Math.round(zoom*100)}%</span><button aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(ROOM_VIEW.maxZoom,Math.round((z+.1)*10)/10))} disabled={zoom>=ROOM_VIEW.maxZoom}>+</button></div>{arranging&&<div className="furniture-controls" aria-label="Arrange furniture"><label>Furniture <select value={selected} onChange={e=>setSelected(e.target.value as FurnitureId)}>{objectsRef.current.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}</select></label><div><button onClick={()=>nudge(-1,0)}>Move left</button><button onClick={()=>nudge(1,0)}>Move right</button><button onClick={()=>nudge(0,-1)}>Move back</button><button onClick={()=>nudge(0,1)}>Move forward</button><button onClick={()=>{onLayoutChange({});avatar.current={x:5,y:5,z:0,v:0};path.current=[];pendingInspect.current=null;hover.current=undefined;setLayoutMessage('Original layout restored.');}}>Reset layout</button></div><p role="status">{layoutMessage}</p></div>}</div>;
 }

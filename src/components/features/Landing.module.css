@@ -1,0 +1,58 @@
+.landing {
+    width: 100%;
+    margin: 0;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px clamp(20px, 5vw, 80px);
+    background: radial-gradient(ellipse at 50% 25%, #e7ecdc 0, transparent 65%), #f7f8f4;
+    color: #303a32;
+}
+.brand { display: flex; justify-content: center; align-items: center; gap: 10px; font-size: 23px; letter-spacing: -1px; }
+.brand strong { font-weight: 400; }
+.welcome { width: min(100%, 780px); margin: 0 auto; padding: 36px 0; text-align: center; animation: welcomeIn 600ms cubic-bezier(.22, 1, .36, 1) both; }
+.emblem { display: grid; place-items: center; width: 86px; height: 86px; margin: 0 auto 26px; border-radius: 24px; background: #dfe7d4; color: #596f48; }
+.eyebrow { font-size: 11px; letter-spacing: 2.5px; color: #596b4c; font-weight: 700; }
+.welcome h1 { margin: 18px 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.08; letter-spacing: -2px; text-wrap: balance; }
+.intro { max-width: 420px; margin: 0 auto; color: #65705b; font-size: 16px; }
+.welcome h2 { margin: 40px 0 18px; font-size: 17px; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; text-align: left; }
+.choice { display: flex; align-items: center; gap: 16px; padding: 26px 22px; border: 1px solid #d6decd; border-radius: 16px; background: #fff; color: #42583b; text-align: left; min-height: 110px; transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease; }
+.choice:hover { background: #edf2e7; box-shadow: 0 8px 24px #303a3218; transform: translateY(-3px); }
+.choice > svg { flex-shrink: 0; }
+.choice > svg:last-child { margin-left: auto; transition: transform 180ms ease; }
+.choice:hover > svg:last-child, .choice:focus-visible > svg:last-child { transform: translateX(4px); }
+.choice strong { display: block; font-size: 18px; margin-bottom: 7px; }
+.choice small { display: block; font-size: 13px; line-height: 1.5; color: #65705b; }
+.note { margin-top: 24px; color: #65705b; font-size: 12px; }
+.footer { text-align: center; font: italic 15px Georgia, serif; color: #65705b; }
+.brand, .footer { animation: fadeIn 650ms ease both; }
+.leaving { animation: landingOut 240ms ease-in both; pointer-events: none; }
+.gameEntrance { min-height: 100svh; background: #27322d; animation: fadeIn 420ms ease-out both; }
+.gameEntrance:focus { outline: none; }
+@keyframes welcomeIn {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes landingOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+@media (max-width: 600px) {
+    .landing { padding: 20px; }
+    .welcome { padding: 36px 0; }
+    .choices { grid-template-columns: 1fr; gap: 12px; }
+    .choice { min-height: 94px; padding: 20px; }
+    .welcome h2 { margin-top: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .landing, .welcome, .brand, .footer, .gameEntrance { animation: none; }
+    .choice, .choice > svg:last-child { transition: none; }
+    .choice:hover, .choice:active, .choice:hover > svg:last-child, .choice:focus-visible > svg:last-child { transform: none; }
+}
