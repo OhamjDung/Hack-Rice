@@ -1,4 +1,4 @@
-# RoomEconomy design system
+# CashBound design system
 
 ## Current direction (user correction)
 
