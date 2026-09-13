@@ -2,6 +2,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Wallet, TrendingUp as TrendingUpIcon } from 'lucide-react';
 import { createMarket, stepMarket, sessionDurationMs, marketFinished, marketInstrument, holdingsValue, type Market } from '@/engine/Market';
+import { tradeSessionCoins } from '@/engine/Investing';
 import StockChart from '@/components/canvas/StockChart';
 type Account = { cash: number; holdings: Record<string, number>; cost: Record<string, number> };
 type TradeLog = { ticker: string; type: 'buy' | 'sell'; qty: number; price: number };
@@ -82,6 +83,8 @@ const TradingFloor = forwardRef<TradingFloorHandle, { startingCash: number; onSe
     const market = marketRef.current, account = accountRef.current;
     const portfolioValue = round2(account.cash + holdingsValue(market, account.holdings));
     const remaining = endAtRef.current - Date.now();
+    const pnl = round2(account.cash - startValueRef.current);
+    const pnlPct = startValueRef.current > 0 ? round2((pnl / startValueRef.current) * 100) : 0;
     return <section className="trade-floor">
       <div className="how-card"><b>This is real stock data.</b> These are 6 real companies&apos; actual prices from a recent trading day, replayed slower than real time. Nothing here predicts which way a price is headed &mdash; you&apos;re watching it happen, same as any trader does.</div>
       <div className="trade-topbar">
@@ -90,6 +93,13 @@ const TradingFloor = forwardRef<TradingFloorHandle, { startingCash: number; onSe
         <div className={`metric timer ${remaining <= Math.min(20000, durationRef.current / 4) ? 'warn' : ''}`}><span className="label">Time left</span><strong>{active ? clock(remaining) : '00:00'}</strong></div>
         <button type="button" className="button secondary end-session" disabled={!active} onClick={settle}>End session</button>
       </div>
+      {!active && <div className="session-summary">
+        <div className="summary-stat"><span className="label">Starting cash</span><strong>{money(startValueRef.current)}</strong></div>
+        <div className="summary-stat"><span className="label">Final cash</span><strong>{money(account.cash)}</strong></div>
+        <div className={`summary-stat pnl ${pnl > 0 ? 'up' : pnl < 0 ? 'down' : ''}`}><span className="label">Profit / loss</span><strong>{money(pnl)} ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)</strong></div>
+        <div className="summary-stat"><span className="label">Trades made</span><strong>{history.length}</strong></div>
+        <div className="summary-stat coins"><span className="label">Coins earned</span><strong>{tradeSessionCoins(startValueRef.current, pnl)}</strong></div>
+      </div>}
       {active && startValueRef.current <= 0 && <div className="locked-banner">Your brokerage account is empty. Put money into Brokerage on the Allocate tab to trade.</div>}
       {!active && <div className="locked-banner">Session ended. Your position was sold to cash &mdash; leave for the Allocate or Projection tab whenever you're ready.</div>}
       <div className="stock-grid">

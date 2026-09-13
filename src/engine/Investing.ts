@@ -107,11 +107,26 @@ export function commitAllocation(state: GameState, alloc: Partial<AllocationFiel
     return s;
 }
 // A trading-floor session's leftover position is sold to cash the moment the session ends — nothing here tracks a live market between visits.
+// Coin reward scales with the session's percent return (not the raw dollar profit) so it's fair
+// regardless of how much cash was allocated to the brokerage; a loss earns nothing.
+export function tradeSessionCoins(startValue: number, sessionPnl: number): number {
+    if (sessionPnl <= 0 || startValue <= 0) return 0;
+    return Math.min(50, Math.round((sessionPnl / startValue) * 100 * 4));
+}
 export function settleBrokerage(state: GameState, finalCash: number, sessionPnl: number): GameState {
     if (state.isGameOver) return state;
     const s = structuredClone(state);
+    const startValue = s.investing.brokerage.cash;
     s.investing.brokerage = { cash: round(finalCash), holdings: {}, cost: {} };
     s.investing.stats.tradingPnl = round(s.investing.stats.tradingPnl + sessionPnl);
+    const coins = tradeSessionCoins(startValue, sessionPnl);
+    if (coins > 0) {
+        s.progression.coins += coins;
+        s.progression.coinLog.unshift({ id: `trade-${s.metrics.turn}-${s.progression.coinLog.length}`, day: s.metrics.turn, amount: coins, reason: 'Profitable trading session' });
+        const message = `Profitable trading session. +${coins} coins. Nice trading.`;
+        s.dialogue = [{ id: `trade-${s.metrics.turn}-${s.dialogue.length}`, day: s.metrics.turn, message, kind: 'reward' }, ...s.dialogue];
+        s.command = { message, severity: 'info', behavior: 'calm', day: s.metrics.turn };
+    }
     return s;
 }
 
@@ -133,7 +148,7 @@ export function growAccounts(accounts: Investing['accounts'], rate = drawMonthly
 }
 
 // Deterministic "if you kept this up" estimate — average-return compounding, not a randomized outcome. INVEST.md §6.
-export const PROJECTION_HORIZONS = [1, 5, 10, 20, 30] as const;
+export const PROJECTION_YEARS_RANGE = { min: 1, max: 40 } as const;
 export const PAY_FREQUENCIES = { weekly: 52, biweekly: 26, semiMonthly: 24, monthly: 12 } as const;
 export type PayFrequency = keyof typeof PAY_FREQUENCIES;
 export function projectAccount(currentBalance: number, contributionPerPeriod: number, periodsPerYear: number, years: number): number {
@@ -142,13 +157,19 @@ export function projectAccount(currentBalance: number, contributionPerPeriod: nu
     const growthOfContributions = r === 0 ? contributionPerPeriod * n : contributionPerPeriod * ((Math.pow(1 + r, n) - 1) / r);
     return round(growthOfCurrentBalance + growthOfContributions);
 }
-export function projectRetirement(state: GameState, frequency: PayFrequency) {
+export function projectRetirement(state: GameState, frequency: PayFrequency, years: number) {
     const periodsPerYear = PAY_FREQUENCIES[frequency], alloc = state.investing.today?.alloc;
+    const clampedYears = Math.max(PROJECTION_YEARS_RANGE.min, Math.min(PROJECTION_YEARS_RANGE.max, years));
     // Today's amounts repeat every pay period; the match uses that period's share of yearly salary.
     const perPeriodSalary = state.profile.income * 12 / periodsPerYear;
     const k401Contribution = (alloc?.k401 ?? 0) + employerMatch(perPeriodSalary, alloc?.k401 ?? 0);
     const tradIraContribution = alloc?.tradIra ?? 0, rothContribution = alloc?.roth ?? 0;
-    const rows = { k401: PROJECTION_HORIZONS.map(t => projectAccount(state.investing.accounts.k401, k401Contribution, periodsPerYear, t)), tradIra: PROJECTION_HORIZONS.map(t => projectAccount(state.investing.accounts.tradIra, tradIraContribution, periodsPerYear, t)), roth: PROJECTION_HORIZONS.map(t => projectAccount(state.investing.accounts.roth, rothContribution, periodsPerYear, t)) };
-    const total = PROJECTION_HORIZONS.map((_, i) => round(rows.k401[i] + rows.tradIra[i] + rows.roth[i]));
-    return { rows, total, brokerageToday: round(state.investing.brokerage.cash) };
+    const rows = { k401: projectAccount(state.investing.accounts.k401, k401Contribution, periodsPerYear, clampedYears), tradIra: projectAccount(state.investing.accounts.tradIra, tradIraContribution, periodsPerYear, clampedYears), roth: projectAccount(state.investing.accounts.roth, rothContribution, periodsPerYear, clampedYears) };
+    const total = round(rows.k401 + rows.tradIra + rows.roth);
+    // What past allocations have actually grown into as of right now — the running balance, not a projection.
+    // It only moves when a real game month closes (see growAccounts in RulesEngine), so revisiting this tab
+    // later in the run shows real accrued growth instead of the same static estimate every time.
+    const present = { k401: round(state.investing.accounts.k401), tradIra: round(state.investing.accounts.tradIra), roth: round(state.investing.accounts.roth) };
+    const presentTotal = round(present.k401 + present.tradIra + present.roth);
+    return { rows, total, present, presentTotal, years: clampedYears, brokerageToday: round(state.investing.brokerage.cash) };
 }

@@ -1894,6 +1894,34 @@ main {
   border-color:#667b52;
   color:#fff
 }
+.projection-table th.years-col {
+  padding-top:8px;
+  padding-bottom:8px;
+  vertical-align:bottom
+}
+.years-field {
+  display:inline-flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;
+  font-size:10px;
+  font-weight:500;
+  white-space:nowrap
+}
+.years-field input {
+  width:56px;
+  padding:5px 7px;
+  margin-top:0;
+  font-size:13px;
+  font-weight:700;
+  text-align:right;
+  font-variant-numeric:tabular-nums
+}
+.years-field input:focus-visible {
+  outline:2px solid #e7dca0;
+  outline-offset:1px;
+  border-color:#667b52
+}
 .table-scroll {
   overflow-x:auto;
   margin:8px 0 18px
@@ -1917,6 +1945,11 @@ main {
   font-weight:700;
   border-top:1px solid var(--ink);
   border-bottom:0
+}
+.projection-table .present-col {
+  background:var(--soft);
+  font-weight:600;
+  border-right:1px solid var(--line)
 }
 .how-card {
   background:var(--soft);
@@ -1963,6 +1996,40 @@ main {
 .trade-topbar .end-session {
   margin-left:auto;
   align-self:center
+}
+.session-summary {
+  display:flex;
+  flex-wrap:wrap;
+  gap:24px;
+  padding:14px 18px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  margin-bottom:16px
+}
+.summary-stat {
+  display:flex;
+  flex-direction:column;
+  gap:4px
+}
+.summary-stat .label {
+  font-size:10px;
+  letter-spacing:.4px;
+  color:var(--muted);
+  text-transform:uppercase
+}
+.summary-stat strong {
+  font-size:17px;
+  font-variant-numeric:tabular-nums
+}
+.summary-stat.pnl.up strong {
+  color:var(--green)
+}
+.summary-stat.pnl.down strong {
+  color:var(--danger)
+}
+.summary-stat.coins strong {
+  color:#a9820f
 }
 .locked-banner {
   background:#fff0e9;
@@ -2164,6 +2231,9 @@ main {
 .trade-topbar {
   gap:14px;
   flex-wrap:wrap
+}
+.session-summary {
+  gap:14px
 }
 
 }
