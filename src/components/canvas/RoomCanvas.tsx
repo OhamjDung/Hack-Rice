@@ -51,6 +51,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const requestedCamera=useRef({rotation,zoom});requestedCamera.current={rotation,zoom};
     const drag=useRef<{id:number;x:number;y:number;rotation:number;moved:boolean}|null>(null);
     const charDrag=useRef<{id:number;x:number}|null>(null);
+    const launch=useRef<{t:number}|null>(null);
     const onSwipeCharacterRef=useRef(onSwipeCharacter);onSwipeCharacterRef.current=onSwipeCharacter;
     const inspectCallback=useRef(onInspect);inspectCallback.current=onInspect;
     const pendingInspect=useRef<CategoryKey|'desk'|null>(null);
@@ -97,8 +98,12 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                     endingNotified.current=true;endingCallback.current?.();
                 }
             }
+            if(launch.current){
+                launch.current.t+=dt;
+                if(launch.current.t>.6){const cb=onSwipeCharacterRef.current;launch.current=null;cb?.();}
+            }
             if(pendingInspect.current&&!path.current.length&&!g.isGameOver){const item=pendingInspect.current;pendingInspect.current=null;inspectCallback.current(item);}
-            if(!arrangeRef.current&&!pendingInspect.current&&!path.current.length&&time>sceneUntil.current&&!g.isGameOver){
+            if(!arrangeRef.current&&!pendingInspect.current&&!path.current.length&&time>sceneUntil.current&&!g.isGameOver&&!launch.current){
                 const event=queue.current.shift();
                 if(event){const scene=transactionScene(event);path.current=findPath(a,objectsRef.current.find(o=>o.id===event.category)||scene.target);activity.current=scene.activity;sceneUntil.current=time+7000;sceneCallback.current?.(scene.line);nextWander.current=time+10000;}
                 else if(time>nextWander.current){const warning=g.command.severity!=='info';const target=warning?(g.command.behavior==='tired'?{x:8,y:2}:Math.floor(time/5000)%2?{x:8,y:2}:{x:5,y:4}):g.life.foodStock<25?{x:2,y:2}:g.life.energy<30?{x:8,y:2}:g.life.stress>=35?{x:8,y:2}:[{x:5,y:4},{x:6,y:9},{x:8,y:2}][Math.floor(time/10000)%3];path.current=findPath(a,target);activity.current=warning?(g.command.behavior==='tired'?'sleeping':'worried'):g.life.energy<30?'sleeping':'idle';nextWander.current=time+(warning?10000:18000);}
@@ -270,10 +275,14 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             if(g.progression.owned.includes('lamp')){box(8,3,.7,.7,20,'#b59c73','#947c59','#7e694b');box(8.3,3.3,.12,.12,30,'#c9b277','#ad995f','#ad995f',20);box(8.1,3.1,.5,.5,9,'#f4dba1','#d4ba83','#baa16c',48);}
             if(g.progression.owned.includes('bookshelf')){box(7,0,1.6,.55,62,'#b58d64','#94704f','#7b5c41');for(let i=0;i<6;i++)box(7.1+i*.2,.5,.13,.12,16,i%2?'#839479':'#c89470','#a28463','#a28463',14);}
             const pos = p(a.x + .5, a.y + .5);
-            renderQueue.push({depth:depth(a.x+.5,a.y+.5),draw:()=>{
+            const flyT=launch.current?.t??0;
+            const displayZ=launch.current?a.z+(reduced?260:flyT*640):a.z;
+            const flyAlpha=launch.current?Math.max(0,1-flyT/.6):1;
+            renderQueue.push({depth:depth(a.x+.5,a.y+.5)+(launch.current?9999:0),draw:()=>{
                 ctx.save();
                 if(g.ending.phase!=='none'&&activity.current==='dead'){const fall=reduced?1:Math.min(1,Math.max(0,endingElapsed.current-3)*1.8);ctx.translate(pos[0],pos[1]);ctx.rotate(-Math.PI/2*fall);ctx.translate(-pos[0],-pos[1]);}
-                drawAvatar(ctx,pos[0],pos[1],a.z,{...g.player,state:activity.current},reduced?0:time,!!target);ctx.restore();
+                ctx.globalAlpha=flyAlpha;
+                drawAvatar(ctx,pos[0],pos[1],displayZ,{...g.player,state:activity.current},reduced?0:time,!!target);ctx.restore();
             }});
             for(let i=0;i<g.life.clutter;i++){const x=7+(i%3)*.7,y=9+Math.floor(i/3)*.5;box(x,y,.45,.4,9,'#cda777','#aa835c','#946c48');}
             drawing=true;renderQueue.sort((a,b)=>a.depth-b.depth).forEach(item=>item.draw());furnitureMode=false;
@@ -335,7 +344,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
         const d=drag.current;if(d&&d.id===e.pointerId){const dx=e.clientX-d.x,dy=e.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;if(d.moved){setRotation(d.rotation+dx/e.currentTarget.getBoundingClientRect().width*360);hover.current=undefined;e.currentTarget.style.cursor='grabbing';}return;}const p=pointer(e);hover.current=hitAt(p.x,p.y);e.currentTarget.style.cursor=hover.current?'pointer':'grab';}
     function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){
         const cd=charDrag.current;
-        if(cd&&cd.id===e.pointerId){charDrag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(Math.abs(e.clientX-cd.x)>56)onSwipeCharacterRef.current?.();return;}
+        if(cd&&cd.id===e.pointerId){charDrag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(Math.abs(e.clientX-cd.x)>56&&!launch.current){path.current=[];pendingInspect.current=null;launch.current={t:0};}return;}
         const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved){if(arranging){const point=pointer(e),hit=hitAt(point.x,point.y);if(hit)setSelected(hit.id);else{const tile=unprojectRoom(point.x,point.y,camera.current.angle);moveSelected(tile.gridX,tile.gridY);}}else inspect(e);}}
     function moveSelected(x:number,y:number){
         const error=placementError(objectsRef.current,selected,x,y,avatar.current);
