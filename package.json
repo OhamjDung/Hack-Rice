@@ -1,5 +1,5 @@
 {
-  "name": "room-economy",
+  "name": "cashbound",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "test:browser": "node scripts/browser-smoke.mjs"
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:room": "node scripts/room-camera-smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",

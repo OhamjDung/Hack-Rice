@@ -66,7 +66,7 @@
 
 .forecast-button{display:flex;align-items:center;gap:7px;width:100%;min-height:44px;margin-top:14px;padding:10px;border:1px solid #8f9e7e;border-radius:8px;background:#41513c;color:#f0f5e9;text-align:left;font-size:12px}.forecast-button:hover{background:#536648}.forecast-button:focus-visible{outline:2px solid #e7dca0;outline-offset:2px}.forecast-content{line-height:1.65;overflow-wrap:anywhere}.forecast-content h3{font-size:15px;margin:18px 0 8px}.forecast-content ol{padding-left:22px;margin-bottom:20px}.forecast-content li{padding:5px 0}.modal{overflow-y:auto;overscroll-behavior:contain;max-height:90dvh}
 
-/* RoomEconomy identity and direct navigation. */
+/* CashBound identity and direct navigation. */
 .world-name{gap:12px;flex-shrink:0}.world-name .world-logo{display:block;width:56px;height:56px;flex-shrink:0}.world-name h1{font-size:26px;letter-spacing:-.9px;line-height:1.1}.world-name h1 span{color:#d7dfbd;font-weight:500}.world-name p{font-size:12px;letter-spacing:.25px;margin-top:6px}.profile-toggle{display:flex;gap:8px;padding:11px 13px}.profile-toggle span{font-size:12px}.world-button:focus-visible{outline:2px solid #e7dca0;outline-offset:3px}
 @media(min-width:651px) and (max-width:1000px){.world-name .world-logo{width:44px;height:44px}.world-name h1{font-size:22px}.game-hud{gap:10px}.profile-toggle{padding:10px}.vitals{gap:10px}}
 @media(max-width:800px){.game-hud{display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:12px}.world-name{grid-column:1;grid-row:1;gap:8px;min-width:0}.world-name .world-logo{width:40px;height:40px}.world-name h1{font-size:21px;letter-spacing:-.75px}.world-name p{display:none}.profile-toggle{grid-column:2;grid-row:1;display:grid;gap:3px;padding:6px;min-width:44px;min-height:44px}.profile-toggle span{font-size:10px}.menu-toggle{grid-column:3;grid-row:1;min-width:44px;min-height:44px}.game-hud .vitals{grid-column:1 / -1;grid-row:2;margin:0;justify-self:start}.hud-coins{position:absolute;top:65px;right:12px}.chapter-marker{top:122px}.chapter-marker h2{font-size:18px}.world-tools .world-button{min-width:44px;min-height:44px}}
@@ -85,3 +85,13 @@
 .day-transactions li{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid #dce3d1}.day-transactions li>div{flex:1;min-width:0}
 .day-transactions strong{display:block;font-size:13px;overflow-wrap:anywhere}.day-transactions small{display:block;font-size:11px;color:#637451;margin-top:5px}.day-transactions b{font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .day-transaction-icon{display:grid;place-items:center;flex-shrink:0;width:30px;height:30px;border-radius:8px;background:#edf1e5;color:#596d47}.day-transactions-error{margin-top:16px;font-size:12px}.day-transactions-error button{margin-top:8px}
+
+
+.furniture-controls{position:absolute;top:100%;z-index:3;width:min(440px,100%);padding:12px;border:1px solid #77876a;border-radius:12px;background:#344237;color:#fff4da;box-shadow:0 8px 24px #17271b55}.furniture-controls label{display:flex;gap:8px;align-items:center}.furniture-controls select{min-width:0;flex:1;padding:8px;background:#24352b;color:inherit;border:1px solid #8c9b77;border-radius:6px}.furniture-controls>div{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}.furniture-controls button{min-height:32px;padding:4px 8px;font-size:12px;border:1px solid #8c9b77;border-radius:6px;background:#44573c;color:inherit}.furniture-controls p{font-size:12px;margin:8px 0 0}.furniture-controls :focus-visible{outline:2px solid #ffe7a2;outline-offset:2px}
+
+.game-world .scene-controls .camera-action{height:28px;min-height:28px;padding:4px 9px;border:1px solid #809371;border-radius:6px;background:#44573c;font-size:11px;font-weight:600;line-height:16px;box-shadow:0 1px 2px #17271b40;cursor:pointer}
+.game-world .scene-controls .camera-action:hover:not(:disabled){background:#536a48;border-color:#a8ba91}
+.game-world .scene-controls .camera-action[aria-pressed="true"]{background:#d5dfb8;border-color:#d5dfb8;color:#26372a}
+.game-world .scene-controls .camera-action:focus-visible{outline:2px solid #ffe7a2;outline-offset:2px}
+.game-world .scene-controls .camera-action:disabled{opacity:.45;cursor:default}
+.game-world .room-scene{min-width:0}

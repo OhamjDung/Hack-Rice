@@ -28,8 +28,8 @@ import {importBankDay,bankTransactionsUpdatedToday} from '@/engine/TransactionUp
 import { responseSchema, dailyOutput, syncOutput } from '@/schemas/api';
 const icons = { food: Utensils, housing: Home, transit: Bus, leisure: Armchair, utilities: Zap, savings: PiggyBank };
 type Dialog = 'transactions-today' | 'monthsummary' | 'forecast' | 'onboard' | 'budget' | 'connect' | 'guide' | 'settings' | 'restart' | 'gameover' | 'journal' | 'events' | 'history' | 'shop' | 'objects' | CategoryKey | 'desk' | null;
-export default function Game() {
-    const [game, setGame] = useState<GameState>(() => createGame());
+export default function Game({ initialGame }: { initialGame?: GameState }) {
+    const [game, setGame] = useState<GameState>(() => initialGame ?? createGame());
     const [ready, setReady] = useState(false);
     const [dialog, setDialog] = useState<Dialog>(null);
     const [busy, setBusy] = useState(false);
@@ -45,14 +45,14 @@ export default function Game() {
     const lock = useRef(false);
     const saveEnabled = useRef(true);
     useEffect(() => { try {
-        const saved = loadGame();
+        const saved = initialGame ?? loadGame();
         if (saved)
             setGame(saved);
     }
     catch (e) {
         saveEnabled.current = false;
         setError(e instanceof Error ? e.message : 'Could not load your saved game.');
-    } setReady(true); }, []);
+    } setReady(true); }, [initialGame]);
     useEffect(() => { if (!ready || !saveEnabled.current)
         return; try {
         saveGame(game);
@@ -129,7 +129,7 @@ export default function Game() {
     }
     catch {
         setDialog(null);
-        setError('Could not import this file. Choose a valid RoomEconomy JSON save under 2 MB.');
+        setError('Could not import this file. Choose a valid CashBound JSON save under 2 MB.');
     }
     finally {
         e.target.value = '';
@@ -143,7 +143,7 @@ export default function Game() {
     return <div className={`game-world ${!game.life.powerOn?'blackout':''} ${game.life.stress>=35?'stressed':''}`} data-testid="game-world">
       <div className="world-grain" aria-hidden="true"/>
       <header className="game-hud">
-        <div className="world-name"><img className="world-logo" src="/room-economy-mark.svg" width={56} height={56} alt="" aria-hidden="true"/><div><h1>Room<span>Economy</span></h1><p>one room. your whole life.</p></div></div>
+        <div className="world-name"><img className="world-logo" src="/room-economy-mark.svg" width={56} height={56} alt="" aria-hidden="true"/><div><h1>Cash<span>Bound</span></h1><p>one room. your whole life.</p></div></div>
         <div className="vitals" aria-label="Character wellbeing">
           {[{label:'Health',value:game.metrics.health,Icon:Heart,style:'health'},{label:'Entertainment',value:game.metrics.happiness,Icon:Smile,style:'mood'},{label:'Energy',value:game.life.energy,Icon:Battery,style:'energy'}].map(({label,value,Icon,style})=><div className={`vital ${style}`} key={label} title={`${label}: ${Math.round(value)} of 100`}><Icon size={17}/><div role="meter" aria-label={label} aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}><i style={{width:`${value}%`}}/></div><span className="sr-only">{label}: {Math.round(value)}</span></div>)}
         </div>
@@ -152,7 +152,7 @@ export default function Game() {
         <button className="world-button menu-toggle" onClick={()=>setDialog('settings')} aria-label="Open game menu"><Menu size={21}/></button>
       </header>
       <div className="chapter-marker"><span>CHAPTER {String(game.completedMonths+1).padStart(2,'0')}</span><h2>{game.isGameOver?'A chance to begin again':game.housingDeficits?'A notice at the door':!game.life.powerOn?'When the lights go out':game.life.stress>=35?'Too much of a good thing':'A place to call your own'}</h2><p>Month {monthOfRun(game.metrics.turn)} · Day {day} / 30 <i/> {game.mode==='demo'?'Your life, your choices':'Linked to your transactions'}</p></div>
-      <div className="world-stage"><RoomCanvas key={run} game={game} onInspect={setDialog} onScene={line=>{setSceneLine(line);setGame(s=>appendDialogue(s,line));}} onEndingComplete={()=>setGame(s=>finishEnding(s))} paused={!!dialog}/></div>
+      <div className="world-stage"><RoomCanvas key={run} game={game} onLayoutChange={roomLayout=>setGame(s=>({...s,roomLayout}))} onInspect={setDialog} onScene={line=>{setSceneLine(line);setGame(s=>appendDialogue(s,line));}} onEndingComplete={()=>setGame(s=>finishEnding(s))} paused={!!dialog}/></div>
       {!ready&&<div className="world-loading" role="status">Opening the door…</div>}
       <div className="world-location"><span>MAPLE STREET · APARTMENT 04</span><small>{game.metrics.roomLevel>1?`Making it your own · Level ${game.metrics.roomLevel}`:'Your first little corner of the world'}</small></div>
       <div className={`character-thought ${isWarning?'warning-command':''}`} role="status"><span className="thought-avatar" style={{background:game.player.shirtColor}}>{game.player.name.slice(0,1)}</span><div><strong>{game.player.name}<span>{isWarning?'spending warning':'is living your story'}</span></strong><p>{thought}</p></div></div>
