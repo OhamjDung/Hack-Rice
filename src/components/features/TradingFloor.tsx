@@ -88,6 +88,7 @@ const TradingFloor = forwardRef<TradingFloorHandle, { startingCash: number; onSe
         <div className="metric"><span className="label">Cash</span><strong>{money(account.cash)}</strong></div>
         <div className="metric"><span className="label">Portfolio</span><strong>{money(portfolioValue)}</strong></div>
         <div className={`metric timer ${remaining <= Math.min(20000, durationRef.current / 4) ? 'warn' : ''}`}><span className="label">Time left</span><strong>{active ? clock(remaining) : '00:00'}</strong></div>
+        <button type="button" className="button secondary end-session" disabled={!active} onClick={settle}>End session</button>
       </div>
       {active && startValueRef.current <= 0 && <div className="locked-banner">Your brokerage account is empty. Put money into Brokerage on the Allocate tab to trade.</div>}
       {!active && <div className="locked-banner">Session ended. Your position was sold to cash &mdash; leave for the Allocate or Projection tab whenever you're ready.</div>}

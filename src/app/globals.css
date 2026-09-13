@@ -1960,6 +1960,10 @@ main {
 .trade-topbar .timer.warn strong {
   color:var(--danger)
 }
+.trade-topbar .end-session {
+  margin-left:auto;
+  align-self:center
+}
 .locked-banner {
   background:#fff0e9;
   border:1px solid #f0c9b5;
