@@ -5,7 +5,7 @@ import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
 import { drawStockBoard } from './StockBoard';
 import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath as routePath, foregroundWalls, roomObjects, placementError, type RoomLayout, type FurnitureId, type RoomObject } from './IsometricEngine';
-export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, onSwipeCharacter, paused=false, investWalk=false, onArriveInvest, guests, readOnly=false }: {
+export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, onSwipeCharacter, paused=false, investWalk=false, onArriveInvest, guests, readOnly=false, onGuestMove }: {
     game: GameState;
     onLayoutChange: (layout:RoomLayout)=>void;
     onInspect: (c: CategoryKey | 'desk') => void;
@@ -16,10 +16,12 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     paused?:boolean;
     investWalk?:boolean;
     onArriveInvest?:()=>void;
-    /** Other accounts currently present in this room — rendered as simple static labeled markers, not fully animated characters. */
-    guests?: { label: string; color?: string }[];
+    /** Other accounts currently present in this room — rendered as simple static labeled markers, not fully animated characters. Position is server-reported (laggy, polled); omit to fall back to a fixed slot. */
+    guests?: { label: string; color?: string; x?: number | null; y?: number | null }[];
     /** True when viewing someone else's saved room (the "visit" feature) — disables walk/inspect/arrange clicks, keeping only camera rotate/zoom. */
     readOnly?: boolean;
+    /** Fires (throttled) with the local guest marker's room position while readOnly, so the host can see it move too. */
+    onGuestMove?: (pos: { x: number; y: number }) => void;
 }) {
     const [arranging,setArranging]=useState(false);
     const [selected,setSelected]=useState<FurnitureId>('leisure');
@@ -70,6 +72,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const readOnlyRef=useRef(readOnly);readOnlyRef.current=readOnly;
     const guestAvatar=useRef({x:1,y:10.3});
     const guestPath=useRef<{x:number;y:number}[]>([]);
+    const onGuestMoveRef=useRef(onGuestMove);onGuestMoveRef.current=onGuestMove;
+    const guestMoveSentAt=useRef(0);
     current.current = game;
     useEffect(() => { avatar.current = { x: 5, y: 5, z: 300, v: 0 }; path.current = []; }, []);
     useEffect(()=>{const fresh=game.transactions.filter(t=>!seen.current.has(t.id)).reverse();for(const t of fresh)seen.current.add(t.id);queue.current.push(...fresh);},[game.transactions]);
@@ -149,6 +153,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                     if(gd<.08){guestAvatar.current.x=gt.x;guestAvatar.current.y=gt.y;guestPath.current.shift();}
                     else{guestAvatar.current.x+=gdx/gd*Math.min(gd,dt*7.2);guestAvatar.current.y+=gdy/gd*Math.min(gd,dt*7.2);}
                 }
+                if(time-guestMoveSentAt.current>500){guestMoveSentAt.current=time;onGuestMoveRef.current?.({x:guestAvatar.current.x,y:guestAvatar.current.y});}
             }
             if(investWalkRef.current&&!investArrived.current&&!path.current.length){investArrived.current=true;investFireAt.current=time+500;}
             if(investFireAt.current!==null&&time>=investFireAt.current){investFireAt.current=null;arriveCallback.current?.();}
@@ -315,7 +320,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
             }});
             (guestsRef.current??[]).forEach((guest,i)=>{
                 const selfControlled=readOnlyRef.current&&i===0;
-                const gx=selfControlled?guestAvatar.current.x+.5:10.5-i*1.3,gy=selfControlled?guestAvatar.current.y+.5:10.3;
+                const gx=selfControlled?guestAvatar.current.x+.5:(guest.x!=null?guest.x+.5:10.5-i*1.3);
+                const gy=selfControlled?guestAvatar.current.y+.5:(guest.y!=null?guest.y+.5:10.3);
                 const [gpx,gpy]=p(gx,gy);
                 renderQueue.push({depth:depth(gx,gy),draw:()=>{
                     ctx.save();
