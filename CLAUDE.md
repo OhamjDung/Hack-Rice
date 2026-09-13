@@ -40,3 +40,21 @@ A financial life simulation game (Next.js 16 / React 19 App Router). The room is
 - Formatting is intentionally dense/minified-looking (long single-line functions, minimal whitespace) — this is the existing house style in `src/engine/*` and `src/lib/*`; match it rather than reformatting. `scripts/format-source.mjs` exists for bulk formatting — check it before hand-reformatting a file.
 - Money values go through `round()` (2 decimals) at the point they're written into state; don't leave unrounded floats in `GameState`.
 - New engine mutators must handle `state.isGameOver` (usually a no-op early return) and go through `structuredClone` rather than mutating the input.
+
+## Side features (isolated, don't touch the main game)
+
+Two additional prototypes live under `src/`, each fully self-contained: their own types/engine/components/CSS, one new route each, zero edits to `src/app`, `src/components`, `src/engine`, `src/lib`, or global CSS outside their own folders. Treat them as separable — safe to delete their folder + route without touching RoomEconomy.
+
+### `src/midgame/` — Bookkeeping mid-game loop (`/midgame`)
+
+A round/week-based paycheck-allocation minigame (401(k) match, IRA annual cap, cash reserve vs. invest-now, weekly Food/Happiness survival, debuffs, micro-events, side hustle, automation). Zustand store (`state/gameStore.ts`), pure engine functions under `engine/` (`roundLifecycle.ts` is the orchestrator), `config.ts` for all tunable numbers. Persists to `localStorage` under `midgame-bookkeeping-v2`. See `midgame/STYLEGUIDE.md` for the dark-world-surface CSS tokens it reuses from `game.css`.
+
+### `src/financegraph/` — Finance Graph (`/financegraph`)
+
+A node-graph personal-finance sim: drag concepts from a **Drawer** onto a React Flow canvas, right-click a node then right-click a second node to connect them, set percent/fixed allocations (sliders), and a time slider projects net worth forward (Recharts) against a rule-based "ghost line" benchmark (`engine/benchmark.ts`'s waterfall allocator — not a real optimizer). Pure engine under `engine/` (`simulate.ts` is the orchestrator; `growth.ts`/`amortization.ts`/`depreciation.ts`/`revolving.ts`/`tax.ts` are the per-subtype formulas, validated against known public-calculator values in `tests/financegraph.test.ts`). Zustand store in `state/graphStore.ts`, persists to `localStorage` under `financegraph-v1`.
+
+- **Locked node taxonomy** (`NODE_TAXONOMY` in `types.ts`) — 6 categories, ~23 subtypes. The LLM ranking output is validated/repaired against this; it can never invent a concept.
+- **Progressive unlock**: concepts start in the Drawer (`???` until it's your turn), one at a time in strict rank order (`unlockRank` = index in the ranking array — never reorder the ranking array after that assignment, or the two drift apart). Spending nodes (rent/food/utilities/entertainment/other) are the exception — auto-placed and unlocked from the start alongside Income/Cash, since they're mandatory costs, not concepts to learn.
+- **`/api/rank`** (`src/app/api/rank/route.ts`) — the only place `GEMINI_API_KEY` is touched. Asks Gemini for `{order, reasoning, instructions}` (unlock order, one-sentence why-ranked-here shown on node hover, step-by-step how-to-use-it shown in the Guide panel as concepts unlock). Always has a deterministic fallback (`data/defaults.ts`) if the key is missing or the call fails for any reason (quota, bad JSON, etc.) — logged via `console.error`, never thrown to the client. Successful LLM responses are also dumped to `.rank-logs/*.json` (gitignored) for inspection.
+- **Mandatory costs come first**: `benchmark.ts` reserves spending/insurance/mortgage/student-loan payments out of income *before* running its 5-step wealth-building waterfall (401k match → credit card → cash buffer → IRA → brokerage) — otherwise the recommendation would ignore rent while suggesting 100% into investments.
+- Setting a spending/insurance node's cost (`graphFactory.ts#setNodeCost`) auto-manages a same-named `Income -> node` edge so the connection renders on the board and the cost actually counts toward `allocatedTotal`/leak in `simulate.ts` — a cost with no edge would otherwise be invisible to both.
