@@ -5,13 +5,15 @@ import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
 import { drawStockBoard } from './StockBoard';
 import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath as routePath, foregroundWalls, roomObjects, placementError, type RoomLayout, type FurnitureId, type RoomObject } from './IsometricEngine';
-export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, paused=false }: {
+export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, paused=false, investWalk=false, onArriveInvest }: {
     game: GameState;
     onLayoutChange: (layout:RoomLayout)=>void;
     onInspect: (c: CategoryKey | 'desk') => void;
     onScene?: (line:string)=>void;
     onEndingComplete?:()=>void;
     paused?:boolean;
+    investWalk?:boolean;
+    onArriveInvest?:()=>void;
 }) {
     const [arranging,setArranging]=useState(false);
     const [selected,setSelected]=useState<FurnitureId>('leisure');
@@ -51,9 +53,18 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const inspectCallback=useRef(onInspect);inspectCallback.current=onInspect;
     const pendingInspect=useRef<CategoryKey|'desk'|null>(null);
     const hover=useRef<RoomObject|undefined>(undefined);
+    const investWalkRef=useRef(investWalk);investWalkRef.current=investWalk;
+    const arriveCallback=useRef(onArriveInvest);arriveCallback.current=onArriveInvest;
+    const investArrived=useRef(false);
+    const investFireAt=useRef<number|null>(null);
     current.current = game;
     useEffect(() => { avatar.current = { x: 5, y: 5, z: 300, v: 0 }; path.current = []; }, []);
     useEffect(()=>{const fresh=game.transactions.filter(t=>!seen.current.has(t.id)).reverse();for(const t of fresh)seen.current.add(t.id);queue.current.push(...fresh);},[game.transactions]);
+    useEffect(()=>{
+        if(!investWalk||game.isGameOver)return;
+        investArrived.current=false;investFireAt.current=null;
+        path.current=findPath(avatar.current,{x:0,y:9});activity.current='working';
+    },[investWalk]);
     useEffect(()=>{
         if(game.ending.phase!=='playing')return;
         endingElapsed.current=0;endingNotified.current=false;queue.current=[];
@@ -114,6 +125,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                     a.y += dy / d * Math.min(d, dt * speed);
                 }
             }
+            if(investWalkRef.current&&!investArrived.current&&!path.current.length){investArrived.current=true;investFireAt.current=time+500;}
+            if(investFireAt.current!==null&&time>=investFireAt.current){investFireAt.current=null;arriveCallback.current?.();}
             if (a.z > 0) {
                 a.v += dt * 850;
                 a.z = Math.max(0, a.z - a.v * dt);

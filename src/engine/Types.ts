@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {progressionSchema,dialogueSchema,endingSchema} from './Progression.ts';
 import { dailyReviewSchema,commandSchema } from './DailyReview.ts';
 import { INITIAL_LIFE } from './Life.ts';
+import { investingSchema, INITIAL_INVESTING } from './Investing.ts';
 export const categories = ['food', 'housing', 'transit', 'leisure', 'utilities', 'savings'] as const;
 export const categorySchema = z.enum(categories);
 export type CategoryKey = z.infer<typeof categorySchema>;
@@ -14,15 +15,26 @@ export type BankTransaction = z.infer<typeof transactionSchema>;
 export const jarSchema = z.object({ category: categorySchema, allocatedAmount: money, spentAmount: money, rolloverAmount: money, minViableSpend: money });
 export type BudgetJar = z.infer<typeof jarSchema>;
 const coachingSchema = z.object({ review: dailyReviewSchema, optionalSpent: z.number().min(0), cashBalance: z.number().finite() });
-const baseStateSchema = z.object({ roomLayout:z.partialRecord(z.enum(['food','utilities','housing','leisure','savings','transit','desk']),z.object({x:z.number().finite().min(0).max(12),y:z.number().finite().min(0).max(12)})).optional(), transactionUpdateTurns: z.array(z.number().int().positive()).optional(), mockFeedDay: z.number().int().min(0).max(30).optional(), coachingBaseline: coachingSchema.optional(), version: z.literal(2), progression:progressionSchema,dialogue:z.array(dialogueSchema).default([]),ending:endingSchema, reviews:z.array(dailyReviewSchema).default([]), command:commandSchema.default({message:'',severity:'info',behavior:'calm',day:0}), life: z.object({lastRestTurn:z.number().int().min(0).default(0),lastTidyTurn:z.number().int().min(0).default(0),foodStock:z.number().min(0).max(100),energy:z.number().min(0).max(100),stress:z.number().min(0).max(100),clutter:z.number().int().min(0).max(12),powerOn:z.boolean(),lastEvent:z.string()}).default(INITIAL_LIFE), profile: profileSchema, player: z.object({ name: z.string(), skinTone: z.string(), hairColor: z.string(), shirtColor: z.string(), pantsColor: z.string(), position: z.object({ x: z.number(), y: z.number(), z: z.number() }), targetPosition: z.object({ x: z.number(), y: z.number() }).nullable(), state: z.enum(['idle', 'walking', 'eating', 'working', 'partying', 'sleeping', 'dead','worried']) }), metrics: z.object({ health: z.number().min(0).max(100), happiness: z.number().min(0).max(100), cashBalance: z.number().finite(), debtBalance: money, turn: z.number().int().min(1), roomLevel: z.number().int().min(1) }), jars: z.object({ food: jarSchema, housing: jarSchema, transit: jarSchema, leisure: jarSchema, utilities: jarSchema, savings: jarSchema }), transactions: z.array(transactionSchema), advisorLog: z.array(z.object({ timestamp: z.number(), severity: z.enum(['info', 'warning', 'critical']), message: z.string(), actionablePlan: z.array(z.string()).optional() })), isGameOver: z.boolean(), gameOverReason: z.string().optional(), housingDeficits: z.number().int().min(0), savedTotal: money, completedMonths: z.number().int().min(0), mode: z.enum(['demo', 'nessie']) });
+const baseStateSchema = z.object({ roomLayout:z.partialRecord(z.enum(['food','utilities','housing','leisure','savings','transit','desk']),z.object({x:z.number().finite().min(0).max(12),y:z.number().finite().min(0).max(12)})).optional(), transactionUpdateTurns: z.array(z.number().int().positive()).optional(), mockFeedDay: z.number().int().min(0).max(30).optional(), coachingBaseline: coachingSchema.optional(), version: z.literal(3), investing: investingSchema, progression:progressionSchema,dialogue:z.array(dialogueSchema).default([]),ending:endingSchema, reviews:z.array(dailyReviewSchema).default([]), command:commandSchema.default({message:'',severity:'info',behavior:'calm',day:0}), life: z.object({lastRestTurn:z.number().int().min(0).default(0),lastTidyTurn:z.number().int().min(0).default(0),foodStock:z.number().min(0).max(100),energy:z.number().min(0).max(100),stress:z.number().min(0).max(100),clutter:z.number().int().min(0).max(12),powerOn:z.boolean(),lastEvent:z.string()}).default(INITIAL_LIFE), profile: profileSchema, player: z.object({ name: z.string(), skinTone: z.string(), hairColor: z.string(), shirtColor: z.string(), pantsColor: z.string(), position: z.object({ x: z.number(), y: z.number(), z: z.number() }), targetPosition: z.object({ x: z.number(), y: z.number() }).nullable(), state: z.enum(['idle', 'walking', 'eating', 'working', 'partying', 'sleeping', 'dead','worried']) }), metrics: z.object({ health: z.number().min(0).max(100), happiness: z.number().min(0).max(100), cashBalance: z.number().finite(), debtBalance: money, turn: z.number().int().min(1), roomLevel: z.number().int().min(1) }), jars: z.object({ food: jarSchema, housing: jarSchema, transit: jarSchema, leisure: jarSchema, utilities: jarSchema, savings: jarSchema }), transactions: z.array(transactionSchema), advisorLog: z.array(z.object({ timestamp: z.number(), severity: z.enum(['info', 'warning', 'critical']), message: z.string(), actionablePlan: z.array(z.string()).optional() })), isGameOver: z.boolean(), gameOverReason: z.string().optional(), housingDeficits: z.number().int().min(0), savedTotal: money, completedMonths: z.number().int().min(0), mode: z.enum(['demo', 'nessie']) });
 const currentStateSchema = baseStateSchema.extend({ rewindCheckpoint: baseStateSchema.optional() });
 export const stateSchema=z.preprocess((value)=>{
- if(typeof value!=='object'||value===null||!('version' in value)||value.version!==1)return value;
- const legacy=z.object({metrics:z.object({turn:z.number().int().positive()}),completedMonths:z.number().int().min(0),transactions:z.array(transactionSchema)}).safeParse(value);
- if(!legacy.success)return value;
- const old=legacy.data;const migratedDay=old.completedMonths*30+((old.metrics.turn-1)%4)*7+1;
- return {...value,version:2,metrics:{...('metrics' in value&&typeof value.metrics==='object'?value.metrics:{}),turn:migratedDay},transactions:old.transactions.map(t=>({...t,gameDay:t.gameDay??migratedDay})),reviews:[],command:{message:'',severity:'info',behavior:'calm',day:0}};
+ const v=migrateVersion(value);
+ // The rewind checkpoint is a full nested state saved under the same version, so it needs the same upgrade.
+ if(typeof v==='object'&&v!==null&&'rewindCheckpoint' in v&&typeof v.rewindCheckpoint==='object'&&v.rewindCheckpoint!==null)return {...v,rewindCheckpoint:migrateVersion(v.rewindCheckpoint)};
+ return v;
 },currentStateSchema);
+function migrateVersion(value:unknown):unknown{
+ let v=value;
+ if(typeof v==='object'&&v!==null&&'version' in v&&v.version===1){
+  const legacy=z.object({metrics:z.object({turn:z.number().int().positive()}),completedMonths:z.number().int().min(0),transactions:z.array(transactionSchema)}).safeParse(v);
+  if(legacy.success){
+   const old=legacy.data;const migratedDay=old.completedMonths*30+((old.metrics.turn-1)%4)*7+1;
+   v={...v,version:2,metrics:{...('metrics' in v&&typeof v.metrics==='object'?v.metrics:{}),turn:migratedDay},transactions:old.transactions.map(t=>({...t,gameDay:t.gameDay??migratedDay})),reviews:[],command:{message:'',severity:'info',behavior:'calm',day:0}};
+  }
+ }
+ if(typeof v==='object'&&v!==null&&'version' in v&&v.version===2)v={...v,version:3,investing:structuredClone(INITIAL_INVESTING)};
+ return v;
+}
 export type GameState = z.infer<typeof stateSchema>;
 export type PlayerCharacter = GameState['player'];
 export type GameMetrics = GameState['metrics'];
