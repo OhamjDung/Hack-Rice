@@ -1,2 +1,2 @@
-import Game from '@/components/features/Game';
-export default function Page() { return <Game />; }
+import Landing from '@/components/features/Landing';
+export default function Page() { return <Landing />; }
