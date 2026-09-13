@@ -78,6 +78,8 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
     const [visiting, setVisiting] = useState<{ username: string; state: GameState } | null>(null);
     const [visitDialogOpen, setVisitDialogOpen] = useState(false);
     const [visitError, setVisitError] = useState('');
+    const [visitors, setVisitors] = useState<string[]>([]);
+    function leaveVisit() { fetch('/api/visit/leave', { method: 'POST' }).catch(() => {}); setVisiting(null); }
     async function goVisit(username: string) {
         setVisitError('');
         try {
@@ -96,6 +98,10 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
             setVisiting({ username: value.data.username, state: value.data.state });
         } catch { setVisiting(null); }
     }, 3000); return () => clearInterval(id); }, [visiting?.username]);
+    // Who is currently visiting my own room — surfaced as guest markers so a visit is mutual.
+    useEffect(() => { if (!ready) return; const poll = async () => {
+        try { const res = await fetch('/api/visitors'); const value = await res.json(); if (res.ok && value.success) setVisitors(value.data); } catch { /* keep last known list */ }
+    }; poll(); const id = setInterval(poll, 3000); return () => clearInterval(id); }, [ready]);
     useEffect(() => { if (game.isGameOver&&game.ending.phase!=='playing'&&!busy)
         setDialog('gameover'); }, [game.isGameOver,game.ending.phase,busy]);
     async function request<T>(job: () => Promise<T>) { if (lock.current)
@@ -180,8 +186,8 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
     // useEffect, which crashed React (#300, "rendered fewer hooks than expected")
     // as soon as a visit actually succeeded.
     if (visiting) return <div className="game-world visiting-world" data-testid="game-world-visiting">
-      <div className="visit-banner" role="status">Visiting <strong>{visiting.username}</strong>'s room (read-only, live) <button className="button secondary" onClick={()=>setVisiting(null)}>Leave</button></div>
-      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}}/></div>
+      <div className="visit-banner" role="status">Visiting <strong>{visiting.username}</strong>'s room (read-only, live) <button className="button secondary" onClick={leaveVisit}>Leave</button></div>
+      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}} guests={[{ label: 'You', color: game.player.shirtColor }]}/></div>
     </div>;
     return <div className={`game-world ${!game.life.powerOn?'blackout':''} ${game.life.stress>=35?'stressed':''}`} data-testid="game-world">
       <div className="world-grain" aria-hidden="true"/>
@@ -200,7 +206,7 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
       </header>
       {view==='invest'&&<InvestScreen ref={investScreenRef} game={game} onClose={goHome} onCommit={alloc=>setGame(s=>commitAllocation(s,alloc))} onSettleBrokerage={(cash,pnl)=>setGame(s=>settleBrokerage(s,cash,pnl))}/>}
       <div className="chapter-marker"><span>CHAPTER {String(game.completedMonths+1).padStart(2,'0')}</span><h2>{game.isGameOver?'A chance to begin again':game.housingDeficits?'A notice at the door':!game.life.powerOn?'When the lights go out':game.life.stress>=35?'Too much of a good thing':'A place to call your own'}</h2><p>Month {monthOfRun(game.metrics.turn)} · Day {day} / 30 <i/> {game.mode==='demo'?'Your life, your choices':'Linked to your transactions'}</p></div>
-      <div className="world-stage"><RoomCanvas key={run} game={game} onLayoutChange={roomLayout=>setGame(s=>({...s,roomLayout}))} investWalk={investWalk} onArriveInvest={()=>{setInvestWalk(false);setView('invest');}} onInspect={setDialog} onScene={line=>{setSceneLine(line);setGame(s=>appendDialogue(s,line));}} onEndingComplete={()=>setGame(s=>finishEnding(s))} onSwipeCharacter={()=>{setVisitError('');setVisitDialogOpen(true);}} paused={!!dialog||view!=='home'}/></div>
+      <div className="world-stage"><RoomCanvas key={run} game={game} onLayoutChange={roomLayout=>setGame(s=>({...s,roomLayout}))} investWalk={investWalk} onArriveInvest={()=>{setInvestWalk(false);setView('invest');}} onInspect={setDialog} onScene={line=>{setSceneLine(line);setGame(s=>appendDialogue(s,line));}} onEndingComplete={()=>setGame(s=>finishEnding(s))} onSwipeCharacter={()=>{setVisitError('');setVisitDialogOpen(true);}} guests={visitors.map(v=>({ label: v }))} paused={!!dialog||view!=='home'}/></div>
       {!ready&&<div className="world-loading" role="status">Opening the door…</div>}
       <div className="world-location"><span>MAPLE STREET · APARTMENT 04</span><small>{game.metrics.roomLevel>1?`Making it your own · Level ${game.metrics.roomLevel}`:'Your first little corner of the world'}</small></div>
       <div className={`character-thought ${isWarning?'warning-command':''}`} role="status"><span className="thought-avatar" style={{background:game.player.shirtColor}}>{game.player.name.slice(0,1)}</span><div><strong>{game.player.name}<span>{isWarning?'spending warning':'is living your story'}</span></strong><p>{thought}</p></div></div>

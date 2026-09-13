@@ -5,7 +5,7 @@ import { transactionScene } from '@/engine/Life';
 import { drawAvatar } from './AvatarRenderer';
 import { drawStockBoard } from './StockBoard';
 import { OBJECTS, ROOM_VIEW, projectRoom, unprojectRoom, findPath as routePath, foregroundWalls, roomObjects, placementError, type RoomLayout, type FurnitureId, type RoomObject } from './IsometricEngine';
-export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, onSwipeCharacter, paused=false, investWalk=false, onArriveInvest }: {
+export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete, onLayoutChange, onSwipeCharacter, paused=false, investWalk=false, onArriveInvest, guests }: {
     game: GameState;
     onLayoutChange: (layout:RoomLayout)=>void;
     onInspect: (c: CategoryKey | 'desk') => void;
@@ -16,6 +16,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     paused?:boolean;
     investWalk?:boolean;
     onArriveInvest?:()=>void;
+    /** Other accounts currently present in this room — rendered as simple static labeled markers, not fully animated characters. */
+    guests?: { label: string; color?: string }[];
 }) {
     const [arranging,setArranging]=useState(false);
     const [selected,setSelected]=useState<FurnitureId>('leisure');
@@ -62,6 +64,7 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const arriveCallback=useRef(onArriveInvest);arriveCallback.current=onArriveInvest;
     const investArrived=useRef(false);
     const investFireAt=useRef<number|null>(null);
+    const guestsRef=useRef(guests);guestsRef.current=guests;
     current.current = game;
     useEffect(() => { avatar.current = { x: 5, y: 5, z: 300, v: 0 }; path.current = []; }, []);
     useEffect(()=>{const fresh=game.transactions.filter(t=>!seen.current.has(t.id)).reverse();for(const t of fresh)seen.current.add(t.id);queue.current.push(...fresh);},[game.transactions]);
@@ -297,6 +300,18 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 ctx.globalAlpha=flyAlpha;
                 drawAvatar(ctx,pos[0],pos[1],displayZ,{...g.player,state:activity.current},reduced?0:time,!!target);ctx.restore();
             }});
+            (guestsRef.current??[]).forEach((guest,i)=>{
+                const gx=10.5-i*1.3,gy=10.3;
+                const [gpx,gpy]=p(gx,gy);
+                renderQueue.push({depth:depth(gx,gy),draw:()=>{
+                    ctx.save();
+                    ctx.beginPath();ctx.arc(gpx,gpy-11,11,0,Math.PI*2);ctx.fillStyle=guest.color||'#d4dfc7';ctx.fill();ctx.strokeStyle='#283622';ctx.lineWidth=1.5;ctx.stroke();
+                    ctx.font='bold 10px sans-serif';ctx.fillStyle='#283622';ctx.textAlign='center';ctx.fillText(guest.label.slice(0,1).toUpperCase(),gpx,gpy-7);
+                    ctx.font='9px sans-serif';ctx.fillStyle='#f5f1e7';ctx.fillText(guest.label,gpx,gpy+15);
+                    ctx.textAlign='left';
+                    ctx.restore();
+                }});
+            });
             for(let i=0;i<g.life.clutter;i++){const x=7+(i%3)*.7,y=9+Math.floor(i/3)*.5;box(x,y,.45,.4,9,'#cda777','#aa835c','#946c48');}
             drawing=true;renderQueue.sort((a,b)=>a.depth-b.depth).forEach(item=>item.draw());furnitureMode=false;
             if(arrangeRef.current){const o=objectsRef.current.find(o=>o.id===selectionRef.current)!;poly([p(o.x,o.y),p(o.x+o.w,o.y),p(o.x+o.w,o.y+o.d),p(o.x,o.y+o.d)],'rgba(231,220,160,.35)','#ffe7a2');}

@@ -23,6 +23,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ usernam
 
     const state = await db().query<{ state: unknown }>('SELECT state FROM game_states WHERE user_id = $1', [target.id]);
     if (!state.rowCount) { console.log(`[visit] ${userId} -> ${target.id} (${target.username}): no game_states row`); return Response.json({ success: false, error: 'That account has no room yet.' }, { status: 404 }); }
+    // Marks the visitor as present in the target's room (surfaced to the target via
+    // /api/visitors) so the visit is mutual, not just a one-way peek.
+    await db().query('INSERT INTO presence (user_id, last_seen, visiting) VALUES ($1, now(), $2) ON CONFLICT (user_id) DO UPDATE SET last_seen = now(), visiting = EXCLUDED.visiting', [userId, target.id]);
     console.log(`[visit] ${userId} -> ${target.id} (${target.username}): ok`);
     return Response.json({ success: true, data: { username: target.username, state: state.rows[0].state } });
   } catch (e) {
