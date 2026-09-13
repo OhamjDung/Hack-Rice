@@ -67,6 +67,9 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     const investArrived=useRef(false);
     const investFireAt=useRef<number|null>(null);
     const guestsRef=useRef(guests);guestsRef.current=guests;
+    const readOnlyRef=useRef(readOnly);readOnlyRef.current=readOnly;
+    const guestAvatar=useRef({x:1,y:10.3});
+    const guestPath=useRef<{x:number;y:number}[]>([]);
     current.current = game;
     useEffect(() => { avatar.current = { x: 5, y: 5, z: 300, v: 0 }; path.current = []; }, []);
     useEffect(()=>{const fresh=game.transactions.filter(t=>!seen.current.has(t.id)).reverse();for(const t of fresh)seen.current.add(t.id);queue.current.push(...fresh);},[game.transactions]);
@@ -137,6 +140,14 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                     const speed=g.life.energy<30?3.6:7.2;
                     a.x += dx / d * Math.min(d, dt * speed);
                     a.y += dy / d * Math.min(d, dt * speed);
+                }
+            }
+            if(readOnlyRef.current){
+                const gt=guestPath.current[0];
+                if(gt){
+                    const gdx=gt.x-guestAvatar.current.x,gdy=gt.y-guestAvatar.current.y,gd=Math.hypot(gdx,gdy);
+                    if(gd<.08){guestAvatar.current.x=gt.x;guestAvatar.current.y=gt.y;guestPath.current.shift();}
+                    else{guestAvatar.current.x+=gdx/gd*Math.min(gd,dt*7.2);guestAvatar.current.y+=gdy/gd*Math.min(gd,dt*7.2);}
                 }
             }
             if(investWalkRef.current&&!investArrived.current&&!path.current.length){investArrived.current=true;investFireAt.current=time+500;}
@@ -303,7 +314,8 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
                 drawAvatar(ctx,pos[0],pos[1],displayZ,{...g.player,state:activity.current},reduced?0:time,!!target);ctx.restore();
             }});
             (guestsRef.current??[]).forEach((guest,i)=>{
-                const gx=10.5-i*1.3,gy=10.3;
+                const selfControlled=readOnlyRef.current&&i===0;
+                const gx=selfControlled?guestAvatar.current.x+.5:10.5-i*1.3,gy=selfControlled?guestAvatar.current.y+.5:10.3;
                 const [gpx,gpy]=p(gx,gy);
                 renderQueue.push({depth:depth(gx,gy),draw:()=>{
                     ctx.save();
@@ -375,7 +387,13 @@ export default function RoomCanvas({ game, onInspect, onScene, onEndingComplete,
     function pointerUp(e:React.PointerEvent<HTMLCanvasElement>){
         const cd=charDrag.current;
         if(cd&&cd.id===e.pointerId){charDrag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(Math.abs(e.clientX-cd.x)>56&&!launch.current&&!pauseRef.current&&!investWalkRef.current){path.current=[];pendingInspect.current=null;launch.current={t:0};}return;}
-        const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';if(!d.moved&&!readOnly){if(arranging){const point=pointer(e),hit=hitAt(point.x,point.y);if(hit)setSelected(hit.id);else{const tile=unprojectRoom(point.x,point.y,camera.current.angle);moveSelected(tile.gridX,tile.gridY);}}else inspect(e);}}
+        const d=drag.current;if(!d||d.id!==e.pointerId)return;drag.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);e.currentTarget.style.cursor='grab';
+        if(!d.moved){
+            if(readOnly){const point=pointer(e),tile=unprojectRoom(point.x,point.y,camera.current.angle);guestPath.current=findPath(guestAvatar.current,{x:tile.gridX,y:tile.gridY});}
+            else if(arranging){const point=pointer(e),hit=hitAt(point.x,point.y);if(hit)setSelected(hit.id);else{const tile=unprojectRoom(point.x,point.y,camera.current.angle);moveSelected(tile.gridX,tile.gridY);}}
+            else inspect(e);
+        }
+    }
     function moveSelected(x:number,y:number){
         const error=placementError(objectsRef.current,selected,x,y,avatar.current);
         if(error){setLayoutMessage(error);return;}
