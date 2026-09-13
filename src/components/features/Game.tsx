@@ -166,7 +166,7 @@ export default function Game({ initialGame }: { initialGame?: GameState }) {
     } }
     if (visiting) return <div className="game-world visiting-world" data-testid="game-world-visiting">
       <div className="visit-banner" role="status">Visiting <strong>{visiting.username}</strong>'s room (read-only, live) <button className="button secondary" onClick={()=>setVisiting(null)}>Leave</button></div>
-      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}} paused/></div>
+      <div className="world-stage"><RoomCanvas game={visiting.state} onLayoutChange={()=>{}} onInspect={()=>{}}/></div>
     </div>;
     const day=dayOfMonth(game.metrics.turn);
     const warnings=roomConditions(game);
